@@ -1,0 +1,8 @@
+python-dotenv
+pyyaml
+pyhcl
+
+fuzzywuzzy
+python-Levenshtein
+
+gitpython
