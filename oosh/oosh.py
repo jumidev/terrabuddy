@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import json, os, sys, yaml, hcl
+from fuzzywuzzy import fuzz
 import argparse, glob
 from subprocess import Popen, PIPE
 
 from collections import OrderedDict
+import re
 
 from git import Repo, Remote, InvalidGitRepositoryError
 import time
@@ -324,6 +326,8 @@ class TemplateParser():
         self.inpattern=inpattern
         self.dir=dir
         self.vars=None
+        self.parse_messages = []
+
 
     def get_yml_vars(self):
         if self.vars == None:
@@ -351,6 +355,15 @@ class TemplateParser():
 
         return abswdir[len(absroot)+1:]
 
+    def check_hclt_files(self):
+        for f in self.get_files():
+            debug("check_hclt_files() checking {}".format(f))
+            with open(f, 'r') as fp:
+                try:
+                    obj = hcl.load(fp)
+                except:
+                    raise Exception("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(f))
+
     def get_files(self):
         git_root = get_project_root(self.dir)
         for (folder, fn) in flatwalk_up(git_root, self.dir):
@@ -364,7 +377,10 @@ class TemplateParser():
             with open(f, 'r') as lines:
                 for line in lines:         
                     data += line
-                self.templates[os.path.basename(f)] = data
+                self.templates[os.path.basename(f)] = {
+                    "filename": f,
+                    "data" : data
+                }
 
     @property
     def oosh_vars_generator(self):
@@ -402,25 +418,80 @@ class TemplateParser():
         return "\n".join(out)
 
     def parse(self):
+
+        self.check_hclt_files()
         self.get_yml_vars()
         self.get_template()
-        self.out_string=u""
 
-        for d in self.templates.values():
-            self.out_string += d
-            self.out_string += "\n"
+        self.out_string=u""
 
         # special vars
         self.vars["COMPONENT_PATH"] = self.component_path
+        self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
         self.vars["OOSH_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
 
-        # self.vars
-        for (k, v) in  self.vars.items():
-            self.out_string = self.out_string.replace('${' + k + '}', v)
+        self.parse_messages = []
+        regex = r"\$\{(.+?)\}"
 
-        # ENV VARS
-        for (k, v) in  os.environ.items():
-            self.out_string = self.out_string.replace('${' + k + '}', v)
+        for fn,d in self.templates.items():
+            # self.vars
+            for (k, v) in  self.vars.items():
+                d['data'] = d['data'].replace('${' + k + '}', v)
+
+            # ENV VARS
+            for (k, v) in  os.environ.items():
+                d['data'] = d['data'].replace('${' + k + '}', v)
+
+
+            # now make sure that all vars have been replaced
+            # exclude commented out lines from check
+            linenum = 0
+            msg = None
+            for line in d['data'].split("\n"):
+                linenum += 1
+                try:
+                    if line.strip()[0] != '#':
+
+                        matches = re.finditer(regex, line)
+
+                        for matchNum, match in enumerate(matches):
+                            miss = match.group()
+
+                            msg = "{} line {}:".format(d['filename'], linenum)
+                            msg += "\n   No substitution found for {}".format(miss)
+
+                            lim = 80
+                            near_matches = {}
+                            for k in self.vars.keys():
+                                ratio = fuzz.ratio(miss, k)
+                                if ratio >= lim:
+                                    near_matches[k] = ratio
+
+                            for k in os.environ.keys():
+                                ratio = fuzz.ratio(miss, k)
+                                if ratio >= lim:
+                                    near_matches[k] = ratio
+
+                            for k,ratio in near_matches.items():
+                                msg += "\n   ==>  Perhaps you meant ${"+k+"}?"
+
+                            msg += "\n"
+                            self.parse_messages.append(msg)
+
+                except IndexError: # an empty line has no first character ;)
+                    pass
+         
+
+            self.out_string += d['data']
+            self.out_string += "\n"
+
+    @property
+    def parse_status(self):
+        if len(self.parse_messages) == 0:
+            return True
+
+        return "\n".join([u"Could not substitute all variables in templates 😢"] + self.parse_messages)
+        
 
     @property
     def hclfile(self):
@@ -459,6 +530,7 @@ def main(argv=[]):
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
     parser.add_argument('--check-git', action='store_true', help='Explicitly enable git repository checks')
     parser.add_argument('--quiet', action='store_true', help='suppress output except fatal errors')
+    parser.add_argument('--debug', action='store_true', help='display debug messages')
 
     clear_cache = False
 
@@ -487,6 +559,10 @@ def main(argv=[]):
     if args.no_check_git or os.getenv('OOSH_NO_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1'] :
         CHECK_GIT = False
 
+    if args.debug or os.getenv('OOSH_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
+        global DEBUG
+        DEBUG = True
+
     # check git
     if CHECK_GIT:
         gitstatus = git_check()
@@ -496,17 +572,22 @@ def main(argv=[]):
     try:
         WDIR = args.command[2]
     except:
-        log("OOPS, no module directory specified, try one of these:")
+        log("OOPS, no component specified, try one of these:")
         example_commands(command)
         return(100)
 
     tp = TemplateParser(dir=WDIR)
     tp.parse()
+
     tp.save_outfile()
+
+    if tp.parse_status != True:
+        print (tp.parse_status)
+        return (120)
 
     wt = WrapTerragrunt()
     
-    if command in ("plan", "apply", "destroy"):
+    if command in ("plan", "apply", "destroy", "refresh"):
         runenv = os.environ.copy
 
         runshow(wt.get_command(command=command, wdir=WDIR))
