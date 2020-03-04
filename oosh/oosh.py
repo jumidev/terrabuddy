@@ -282,6 +282,33 @@ def git_check(wdir='.'):
         return 0
 
 
+def check_hclt_file(path):
+    only_whitespace = True
+    with open(path, 'r') as lines:
+        for line in lines:         
+            if line.strip != "":
+                only_whitespace = False
+                break
+    if not only_whitespace:
+        with open(path, 'r') as fp:
+            try:
+                obj = hcl.load(fp)
+            except:
+                raise Exception("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(f))
+
+def format_hclt_file(path):
+    log("Formatting {}".format(path))
+    check_hclt_file(path)
+    cmd = "cat \"{}\" | terraform fmt -".format(path)
+    (out, err, exitcode) = run(cmd)
+
+    if exitcode == 0:
+        with open(path, 'w') as fh:
+            fh.write(out)
+        
+    else:
+        raise Exception(err)
+
 class WrapTerragrunt():
 
     def __init__(self):
@@ -358,11 +385,7 @@ class TemplateParser():
     def check_hclt_files(self):
         for f in self.get_files():
             debug("check_hclt_files() checking {}".format(f))
-            with open(f, 'r') as fp:
-                try:
-                    obj = hcl.load(fp)
-                except:
-                    raise Exception("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(f))
+            check_hclt_file(f)
 
     def get_files(self):
         git_root = get_project_root(self.dir)
@@ -535,6 +558,7 @@ def main(argv=[]):
     clear_cache = False
 
     args = parser.parse_args(args=argv)
+    # TODO add project specific args to oosh.yml
 
     if args.quiet:
         LOG = None
@@ -569,25 +593,33 @@ def main(argv=[]):
         if gitstatus != 0:
             return gitstatus
 
-    try:
-        WDIR = args.command[2]
-    except:
-        log("OOPS, no component specified, try one of these:")
-        example_commands(command)
-        return(100)
+    #TODO add "env" command to show the env vars with optional --export command for exporting to bash env vars
 
-    tp = TemplateParser(dir=WDIR)
-    tp.parse()
+    if command == "format":
+        for (dirpath, filename) in flatwalk('.'):
+            if filename.endswith('.hclt'):
+                format_hclt_file("{}/{}".format(dirpath, filename))
 
-    tp.save_outfile()
 
-    if tp.parse_status != True:
-        print (tp.parse_status)
-        return (120)
+    if command in ("plan", "apply", "destroy", "refresh", "show"):
+        try:
+            WDIR = args.command[2]
+        except:
+            log("OOPS, no component specified, try one of these:")
+            example_commands(command)
+            return(100)
+            
+        tp = TemplateParser(dir=WDIR)
+        tp.parse()
 
-    wt = WrapTerragrunt()
-    
-    if command in ("plan", "apply", "destroy", "refresh"):
+        tp.save_outfile()
+
+        if tp.parse_status != True:
+            print (tp.parse_status)
+            return (120)
+
+        wt = WrapTerragrunt()
+
         runenv = os.environ.copy
 
         runshow(wt.get_command(command=command, wdir=WDIR))
