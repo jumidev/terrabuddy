@@ -87,65 +87,11 @@ def flatwalk(path):
         for fn in c:
             yield (folder, fn)
 
-def example_commands(command):
-    git_filtered=os.getenv('OOSH_GIT_FILTER', "False").lower()  in ("on", "true", "1")
-
-    log("")
-
-    for which, component in get_components(git_filtered=git_filtered):     
-        log("{} {} {}".format(PACKAGE, command, component))
-    log("")
 
 
-def get_components(dir='.', git_filtered=False):
-    filtered = []
-    if git_filtered:
-        (out, err, exitcode) = run("git status -s -uall")
-        for line in out.split("\n"):
-            p = line.split(" ")[-1]
-            if len(p) > 3:
-                filtered.append(os.path.dirname(p))
-
-    for (dirpath, filename) in flatwalk('.'):
-        dirpath = dirpath[2:]
-        if filename in ['terragrunt.hclt', "bundle.yml"] and len(dirpath) > 0:
-            which = "component"
-            if filename == "bundle.yml":
-                which = "bundle"
-            if git_filtered:
-                match = False
-                for f in filtered:
-                    if f.startswith(dirpath):
-                        match = True
-                        break
-                if match:
-                    yield(which, dirpath)
-
-            else:
-                yield(which, dirpath)
 
 
-def component_type(component, dir='.'):
-    for which, c in get_components(dir=dir):
-        if c == component:
-            return which
 
-    return None
-
-
-def get_project_root(dir=".", fallback_to_git=True, conf_marker="oosh.yml"):
-    d = os.path.abspath(dir)
-
-    if os.path.isfile("{}/{}".format(d, conf_marker)):
-        return dir
-    if fallback_to_git and dir_is_git_repo(dir):
-        return dir
-    
-    oneup = os.path.abspath(dir+'/../')
-    if oneup != "/":
-        return get_project_root(oneup, fallback_to_git, conf_marker)
-    
-    raise "Could not find a project root directory"
 
 def dir_is_git_repo(dir):
     try:
@@ -298,39 +244,6 @@ def git_check(wdir='.'):
         return 0
 
 
-def check_hclt_file(path):
-    only_whitespace = True
-    with open(path, 'r') as lines:
-        for line in lines:    
-            #debug("##{}##".format(line.strip()))     
-            if line.strip() != "":
-                only_whitespace = False
-                break
-    #debug(only_whitespace)     
-
-    if not only_whitespace:
-        with open(path, 'r') as fp:
-            try:
-                obj = hcl.load(fp)
-            except:
-                raise Exception("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
-
-    return only_whitespace
-
-def format_hclt_file(path):
-    log("Formatting {}".format(path))
-    only_whitespace = check_hclt_file(path)
-    if not only_whitespace:
-        cmd = "cat \"{}\" | terraform fmt -".format(path)
-        (out, err, exitcode) = run(cmd)
-
-        if exitcode == 0:
-            with open(path, 'w') as fh:
-                fh.write(out)
-            
-        else:
-            raise Exception(err)
-
 class WrapTerragrunt():
 
     def __init__(self):
@@ -369,18 +282,174 @@ class WrapTerragrunt():
         debug("running command:\n{}".format(cmd))
         return cmd
 
-class TemplateParser():
+class Project():
 
-    def __init__(self, inpattern=".hclt", dir=os.getcwd()):
+    def __init__(self,
+        git_filtered=os.getenv('OOSH_GIT_FILTER', "False").lower()  in ("on", "true", "1"),
+        conf_marker="oosh.yml",
+        inpattern=".hclt",
+        dir=os.getcwd()):
+
         self.inpattern=inpattern
         self.dir=dir
         self.vars=None
         self.parse_messages = []
 
+        self.components = None
+        self.git_filtered = git_filtered
+        self.conf_marker = conf_marker
+
+    def set_dir(self, dir):
+        self.dir=dir
+        self.components = None
+
+    def check_hclt_file(self, path):
+        only_whitespace = True
+        with open(path, 'r') as lines:
+            for line in lines:    
+                #debug("##{}##".format(line.strip()))     
+                if line.strip() != "":
+                    only_whitespace = False
+                    break
+        #debug(only_whitespace)     
+
+        if not only_whitespace:
+            with open(path, 'r') as fp:
+                try:
+                    obj = hcl.load(fp)
+                except:
+                    raise Exception("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
+
+        return only_whitespace
+
+    def format_hclt_file(self, path):
+        log("Formatting {}".format(path))
+        only_whitespace = self.check_hclt_file(path)
+        if not only_whitespace:
+            cmd = "cat \"{}\" | terraform fmt -".format(path)
+            (out, err, exitcode) = run(cmd)
+
+            if exitcode == 0:
+                with open(path, 'w') as fh:
+                    fh.write(out)
+                
+            else:
+                raise Exception(err)
+
+    def example_commands(self, command):
+        log("")
+
+        for which, component in self.get_components():     
+            log("{} {} {}".format(PACKAGE, command, component))
+        log("")
+        
+    def get_project_root(self, dir=".", fallback_to_git=True):
+        d = os.path.abspath(dir)
+
+        if os.path.isfile("{}/{}".format(d, self.conf_marker)):
+            return dir
+        if fallback_to_git and dir_is_git_repo(dir):
+            return dir
+        
+        oneup = os.path.abspath(dir+'/../')
+        if oneup != "/":
+            return self.get_project_root(oneup, fallback_to_git)
+        
+        raise "Could not find a project root directory"
+
+   # def get_filtered_components(wdir, filter):
+
+    def get_components(self, dir='.'):
+        if self.components == None:
+            self.components = []
+            filtered = []
+            if self.git_filtered:
+                (out, err, exitcode) = run("git status -s -uall")
+                for line in out.split("\n"):
+                    p = line.split(" ")[-1]
+                    if len(p) > 3:
+                        filtered.append(os.path.dirname(p))
+
+            for (dirpath, filename) in flatwalk('.'):
+                dirpath = dirpath[2:]
+                if filename in ['terragrunt.hclt', "bundle.yml"] and len(dirpath) > 0:
+                    which = "component"
+                    if filename == "bundle.yml":
+                        which = "bundle"
+                    if self.git_filtered:
+                        match = False
+                        for f in filtered:
+                            if f.startswith(dirpath):
+                                match = True
+                                break
+                        if match:
+                            self.components.append((which, dirpath))
+
+                    else:
+                        self.components.append((which, dirpath))
+        
+        return self.components
+    
+
+
+    def component_type(self, component, dir='.'):
+        for which, c in self.get_components(dir=dir):
+            if c == component:
+                return which
+
+        return None
+
+
+    def get_bundle(self, wdir):
+        components = []
+
+        if wdir[-1] == "*":
+            debug("")
+            debug("get_bundle wdir {}".format(wdir))
+            wdir = os.path.relpath(wdir[0:-1])
+            for which, c in self.get_components():
+                if c.startswith(wdir):
+                    components.append(c)
+
+                    debug("get_bundle  {}".format(c))
+            debug("")
+            return components
+
+        bundleyml = '{}/{}'.format(wdir, "bundle.yml")
+
+        if not os.path.isfile(bundleyml):
+            return [wdir]
+
+        with open(bundleyml, 'r') as fh:
+            d = yaml.load(fh, Loader=yaml.FullLoader)
+
+        order = d['order']
+
+        if type(order) == list:
+            for i in order:
+                component = "{}/{}".format(wdir, i)
+                if self.component_type(component, wdir) == "component":
+                    components.append(component)
+                else:
+                    for c in  self.get_bundle(component):
+                        components.append(c)
+
+        return components
+
+    def check_hclt_files(self):
+        for f in self.get_files():
+            debug("check_hclt_files() checking {}".format(f))
+            self.check_hclt_file(f)
+
+    def get_files(self):
+        git_root = self.get_project_root(self.dir)
+        for (folder, fn) in flatwalk_up(git_root, self.dir):
+            if fn.endswith(self.inpattern):
+                yield "{}/{}".format(folder, fn)
 
     def get_yml_vars(self):
         if self.vars == None:
-            git_root = get_project_root(self.dir)
+            git_root = self.get_project_root(self.dir)
             self.vars={}
             for (folder, fn) in flatwalk_up(git_root, self.dir):
                 if fn.endswith('.yml'):
@@ -400,20 +469,9 @@ class TemplateParser():
     @property
     def component_path(self):
         abswdir = os.path.abspath(self.dir)
-        absroot = get_project_root(self.dir)
+        absroot = self.get_project_root(self.dir)
 
         return abswdir[len(absroot)+1:]
-
-    def check_hclt_files(self):
-        for f in self.get_files():
-            debug("check_hclt_files() checking {}".format(f))
-            check_hclt_file(f)
-
-    def get_files(self):
-        git_root = get_project_root(self.dir)
-        for (folder, fn) in flatwalk_up(git_root, self.dir):
-            if fn.endswith(self.inpattern):
-                yield "{}/{}".format(folder, fn)
 
     def get_template(self):
         self.templates = OrderedDict()
@@ -615,67 +673,80 @@ def main(argv=[]):
         if gitstatus != 0:
             return gitstatus
 
+
+    project = Project()
+    wt = WrapTerragrunt()
+
     #TODO add "env" command to show the env vars with optional --export command for exporting to bash env vars
 
     if command == "format":
         for (dirpath, filename) in flatwalk('.'):
             if filename.endswith('.hclt'):
-                format_hclt_file("{}/{}".format(dirpath, filename))
-
+                project.format_hclt_file("{}/{}".format(dirpath, filename))
 
     if command in ("plan", "apply", "destroy", "refresh", "show"):
+
         try:
-            wdir = args.command[2]
+            wdir = os.path.relpath(args.command[2])
         except:
             log("OOPS, no component specified, try one of these:")
-            example_commands(command)
+            project.example_commands(command)
             return(100)
 
-        wt = WrapTerragrunt()
+        if not os.path.isdir(wdir):
+            log("ERROR: {} is not a directory".format(wdir))
+            return -1
+        
+        project.set_dir(wdir)
 
-        t = component_type(component=wdir)
+        force = args.force
+
+        # -auto-approve and refresh do not mix
+        if command in ["refresh"]:
+            force = False
+
+        if force:
+            wt.set_option("--terragrunt-non-interactive")
+            wt.set_option("-auto-approve")
+
+        t = project.component_type(component=wdir)
         if t == "component":
-            tp = TemplateParser(dir=wdir)
-            tp.parse()
+            project.parse()
 
-            tp.save_outfile()
+            project.save_outfile()
 
-            if tp.parse_status != True:
-                print (tp.parse_status)
+            if project.parse_status != True:
+                print (project.parse_status)
                 return (120)
-
 
             runenv = os.environ.copy
 
-            runshow(wt.get_command(command=command, wdir=wdir))
+            if not args.dry:               
+                runshow(wt.get_command(command=command, wdir=wdir))
         elif t == "bundle":
-            with open(r'{}/{}'.format(wdir, "bundle.yml")) as fh:
-                d = yaml.load(fh, Loader=yaml.FullLoader)
-
-            order = d['order']
-            if command in ['destroy']:
-                order.reverse()
-
             log("Performing {} on bundle {}".format(command, wdir))
-            if type(order) == list:
-                for i in order:
-                    component = "{}/{}".format(wdir, i)
-                    tp = TemplateParser(dir=component)
-                    tp.parse()
-                    tp.save_outfile()
+            for component in project.get_bundle(wdir):
+                project.set_dir(component)
+                project.parse()
+                project.save_outfile()
 
-                    if tp.parse_status != True:
-                        print (tp.parse_status)
-                        return (120)
+                if project.parse_status != True:
+                    print (project.parse_status)
+                    return (120)
 
-                    runenv = os.environ.copy
-                    log("{} {} {}".format(PACKAGE, command, component))
-                    retcode = runshow(wt.get_command(command=command, wdir=component))
+                runenv = os.environ.copy
+                log("{} {} {}".format(PACKAGE, command, component))
+                if args.dry:
+                    continue
 
-                    if retcode != 0:
-                        log("Got a non zero return code, stopping bundle")
-                        return retcode
+                retcode = runshow(wt.get_command(command=command, wdir=component))
 
+                if retcode != 0:
+                    log("Got a non zero return code, stopping bundle")
+                    return retcode
+        else:
+            log("ERROR {}: this directory is neither a component nor a bundle, nothing to do".format(wdir))
+            return 130
             
 
 
