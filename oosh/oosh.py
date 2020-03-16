@@ -45,7 +45,7 @@ def run(cmd, splitlines=False, env=os.environ, raise_exception_on_fail=False):
     exitcode = int(proc.returncode)
 
     if raise_exception_on_fail and exitcode != 0:
-        raise Exception("Running {} resulted in return code {}, below is stderr: {}".format(cmd, exitcode, err))
+        raise Exception("Running {} resulted in return code {}, below is stderr: \n {}".format(cmd, exitcode, err))
 
     return (out, err, exitcode)
 
@@ -160,80 +160,76 @@ def git_check(wdir='.'):
     # check if local branch is ahead and /or behind remote branch
     command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, origin_branch)
     #print command
-    (ahead_behind, err, exitcode) = run(command)
+    (ahead_behind, err, exitcode) = run(command, raise_exception_on_fail=True)
     ahead_behind = ahead_behind.strip().split("\t")
     ahead = int(ahead_behind[0])
     behind = int(ahead_behind.pop())
     
-    if exitcode != 0:
-        # if exitcode is not zero something serious went wrong
-        raise("An error occurred while running '{}'\n\n".format( command, err))
+    if behind > 0:
+        sys.stderr.write("")
+        sys.stderr.write("GIT ERROR: You are on branch {} and are behind the remote.  Please git pull and/or merge before proceeding.  Below is a git status:".format(branch))
+        sys.stderr.write("")
+        (status, err, exitcode) = run("git -C {} status ".format(git_root))
+        sys.stderr.write(status)
+        sys.stderr.write("")
+        return(-1)
     else:
-        if behind > 0:
-            sys.stderr.write("")
-            sys.stderr.write("GIT ERROR: You are on branch {} and are behind the remote.  Please git pull and/or merge before proceeding.  Below is a git status:".format(branch))
-            sys.stderr.write("")
-            (status, err, exitcode) = run("git -C {} status ".format(git_root))
-            sys.stderr.write(status)
-            sys.stderr.write("")
-            return(-1)
-        else:
+    
+        OOSH_GIT_DEFAULT_BRANCH = os.getenv('OOSH_GIT_DEFAULT_BRANCH', 'master')
         
-            OOSH_GIT_DEFAULT_BRANCH = os.getenv('OOSH_GIT_DEFAULT_BRANCH', 'master')
+        if branch != OOSH_GIT_DEFAULT_BRANCH:
+            '''
+                in this case assume we're on a feature branch
+                if the FB is behind master then issue a warning
+            '''
+            command = "git -C {} branch -vv | grep {} ".format(git_root, OOSH_GIT_DEFAULT_BRANCH)
+            (origin_master, err, exitcode) = run(command)
+            if exitcode != 0:
+                '''
+                In this case the git repo does not contain OOSH_GIT_DEFAULT_BRANCH, so I guess assume that we're 
+                on the default branch afterall and that we're up to date persuant to the above code
+                '''
+                return 0
             
-            if branch != OOSH_GIT_DEFAULT_BRANCH:
-                '''
-                 in this case assume we're on a feature branch
-                 if the FB is behind master then issue a warning
-                '''
-                command = "git -C {} branch -vv | grep {} ".format(git_root, OOSH_GIT_DEFAULT_BRANCH)
-                (origin_master, err, exitcode) = run(command)
-                if exitcode != 0:
-                    '''
-                    In this case the git repo does not contain OOSH_GIT_DEFAULT_BRANCH, so I guess assume that we're 
-                    on the default branch afterall and that we're up to date persuant to the above code
-                    '''
-                    return 0
+            for line in origin_master.split("\n"):
+                if line.strip().startswith(OOSH_GIT_DEFAULT_BRANCH):
+                    origin = line.strip().split('[')[1].split('/')[0]
+
+            assert origin != None
+
+            command = "git -C {} rev-list --left-right --count \"{}...{}/{}\"".format(git_root, branch, origin, OOSH_GIT_DEFAULT_BRANCH)
+            (ahead_behind, err, exitcode) = run(command)
+            ahead_behind = ahead_behind.strip().split("\t")
+            ahead = int(ahead_behind[0])
+            behind = int(ahead_behind.pop())
+
+            command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, OOSH_GIT_DEFAULT_BRANCH)
+            (ahead_behind, err, exitcode) = run(command)
+            ahead_behind = ahead_behind.strip().split("\t")
+            local_ahead = int(ahead_behind[0])
+            local_behind = int(ahead_behind.pop())
+
+            
+            if behind > 0:
+                sys.stderr.write("")
+                sys.stderr.write("GIT WARNING: Your branch, {}, is {} commit(s) behind {}/{}.\n".format(branch, behind, origin, OOSH_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("This action may clobber new changes that have occurred in {} since your branch was made.\n".format(OOSH_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("It is recommended that you stop now and merge or rebase from {}\n".format(OOSH_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("\n")
                 
-                for line in origin_master.split("\n"):
-                    if line.strip().startswith(OOSH_GIT_DEFAULT_BRANCH):
-                        origin = line.strip().split('[')[1].split('/')[0]
-
-                assert origin != None
-
-                command = "git -C {} rev-list --left-right --count \"{}...{}/{}\"".format(git_root, branch, origin, OOSH_GIT_DEFAULT_BRANCH)
-                (ahead_behind, err, exitcode) = run(command)
-                ahead_behind = ahead_behind.strip().split("\t")
-                ahead = int(ahead_behind[0])
-                behind = int(ahead_behind.pop())
-
-                command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, OOSH_GIT_DEFAULT_BRANCH)
-                (ahead_behind, err, exitcode) = run(command)
-                ahead_behind = ahead_behind.strip().split("\t")
-                local_ahead = int(ahead_behind[0])
-                local_behind = int(ahead_behind.pop())
-
-                
-                if behind > 0:
+                if ahead != local_ahead or behind != local_behind:
                     sys.stderr.write("")
-                    sys.stderr.write("GIT WARNING: Your branch, {}, is {} commit(s) behind {}/{}.\n".format(branch, behind, origin, OOSH_GIT_DEFAULT_BRANCH))
-                    sys.stderr.write("This action may clobber new changes that have occurred in {} since your branch was made.\n".format(OOSH_GIT_DEFAULT_BRANCH))
-                    sys.stderr.write("It is recommended that you stop now and merge or rebase from {}\n".format(OOSH_GIT_DEFAULT_BRANCH))
+                    sys.stderr.write("INFO: your local {} branch is not up to date with {}/{}\n".format(OOSH_GIT_DEFAULT_BRANCH, origin, OOSH_GIT_DEFAULT_BRANCH))
+                    sys.stderr.write("HINT:")
+                    sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(OOSH_GIT_DEFAULT_BRANCH, branch))
                     sys.stderr.write("\n")
                     
-                    if ahead != local_ahead or behind != local_behind:
-                        sys.stderr.write("")
-                        sys.stderr.write("INFO: your local {} branch is not up to date with {}/{}\n".format(OOSH_GIT_DEFAULT_BRANCH, origin, OOSH_GIT_DEFAULT_BRANCH))
-                        sys.stderr.write("HINT:")
-                        sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(OOSH_GIT_DEFAULT_BRANCH, branch))
-                        sys.stderr.write("\n")
-                        
-                    answer = raw_input("Do you want to continue anyway? [y/N]? ").lower()
-                    
-                    if answer != 'y':
-                        log("")
-                        log("Aborting due to user input")
-                        exit()
+                answer = raw_input("Do you want to continue anyway? [y/N]? ").lower()
+                
+                if answer != 'y':
+                    log("")
+                    log("Aborting due to user input")
+                    exit()
             
         return 0
 
@@ -328,14 +324,12 @@ class Project():
         only_whitespace = self.check_hclt_file(path)
         if not only_whitespace:
             cmd = "cat \"{}\" | terraform fmt -".format(path)
-            (out, err, exitcode) = run(cmd)
+            (out, err, exitcode) = run(cmd, raise_exception_on_fail=True)
 
-            if exitcode == 0:
-                with open(path, 'w') as fh:
-                    fh.write(out)
+            with open(path, 'w') as fh:
+                fh.write(out)
                 
-            else:
-                raise Exception(err)
+
 
     def example_commands(self, command):
         log("")
@@ -365,7 +359,7 @@ class Project():
             self.components = []
             filtered = []
             if self.git_filtered:
-                (out, err, exitcode) = run("git status -s -uall")
+                (out, err, exitcode) = run("git status -s -uall", raise_exception_on_fail=True)
                 for line in out.split("\n"):
                     p = line.split(" ")[-1]
                     if len(p) > 3:
