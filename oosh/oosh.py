@@ -30,7 +30,7 @@ def debug(s):
     if DEBUG == True:
         print (s)
 
-def run(cmd, splitlines=False, env=os.environ):
+def run(cmd, splitlines=False, env=os.environ, raise_exception_on_fail=False):
     # you had better escape cmd cause it's goin to the shell as is
     proc = Popen([cmd], stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True, env=env)
     out, err = proc.communicate()
@@ -43,6 +43,9 @@ def run(cmd, splitlines=False, env=os.environ):
         out = out_split
 
     exitcode = int(proc.returncode)
+
+    if raise_exception_on_fail and exitcode != 0:
+        raise Exception("Running {} resulted in return code {}, below is stderr: {}".format(cmd, exitcode, err))
 
     return (out, err, exitcode)
 
@@ -87,12 +90,6 @@ def flatwalk(path):
         for fn in c:
             yield (folder, fn)
 
-
-
-
-
-
-
 def dir_is_git_repo(dir):
     try:
         repo = Repo(dir)
@@ -116,7 +113,6 @@ def git_rootdir(dir="."):
             # not a git repository
             return None
 
-
 def git_check(wdir='.'):
     
     git_root = git_rootdir(wdir)
@@ -133,11 +129,9 @@ def git_check(wdir='.'):
         # so set time diff to more than a minute to force a fetch
         diff = 61
         
-    
     repo = Repo(git_root)
 
     assert not repo.bare
-
 
     remote_names = []
     
@@ -243,7 +237,6 @@ def git_check(wdir='.'):
             
         return 0
 
-
 class WrapTerragrunt():
 
     def __init__(self):
@@ -251,6 +244,7 @@ class WrapTerragrunt():
         self.tg_bin = os.getenv("TERRAGRUNT_BIN", "terragrunt")
         self.tf_bin = os.getenv("TERRAFORM_BIN", "terraform")
         self.terragrunt_options = []
+        self.quiet = False
 
 
     def get_cache_dir(ymlfile, package_name):
@@ -260,6 +254,9 @@ class WrapTerragrunt():
 
     def set_option(self, option):
         self.terragrunt_options.append(option)
+
+    def set_quiet(self, which=True):
+        self.quiet = which
 
     def get_download_dir(self):
         return os.getenv('TERRAGRUNT_DOWNLOAD_DIR',"~/.terragrunt")
@@ -278,7 +275,11 @@ class WrapTerragrunt():
         else:
             var_file = ""
 
-        cmd = "{} {} --terragrunt-source-update --terragrunt-working-dir {} {} {} {} ".format(self.tg_bin, command, wdir, var_file, " ".join(self.terragrunt_options), " ".join(extra_args))
+        cmd = "{} {} --terragrunt-source-update --terragrunt-working-dir {} {} {} {} ".format(self.tg_bin, command, wdir, var_file, " ".join(set(self.terragrunt_options)), " ".join(extra_args))
+        
+        if self.quiet:
+            cmd += " > /dev/null 2>&1 "
+        
         debug("running command:\n{}".format(cmd))
         return cmd
 
@@ -301,7 +302,7 @@ class Project():
 
     def set_dir(self, dir):
         self.dir=dir
-        self.components = None
+        self.vars = None
 
     def check_hclt_file(self, path):
         only_whitespace = True
@@ -601,9 +602,6 @@ class Project():
         self.parse()
         return self.out_string# + "\n" + self.oosh_vars_generator
 
-
-
-
 def main(argv=[]):
 
     epilog = """The following arguments can be activated using environment variables:
@@ -633,6 +631,7 @@ def main(argv=[]):
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
     parser.add_argument('--check-git', action='store_true', help='Explicitly enable git repository checks')
     parser.add_argument('--quiet', action='store_true', help='suppress output except fatal errors')
+    parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
     parser.add_argument('--debug', action='store_true', help='display debug messages')
 
     clear_cache = False
@@ -640,9 +639,11 @@ def main(argv=[]):
     args = parser.parse_args(args=argv)
     # TODO add project specific args to oosh.yml
 
-    if args.quiet:
-        LOG = None
-        TERRAGRUNT_REDIRECT = " > /dev/null 2>&1 "
+    global LOG
+
+
+    if args.quiet or args.json:
+        LOG = False
 
     # grab args
     
@@ -709,6 +710,9 @@ def main(argv=[]):
             wt.set_option("--terragrunt-non-interactive")
             wt.set_option("-auto-approve")
 
+        if args.quiet:
+            wt.set_quiet()
+
         t = project.component_type(component=wdir)
         if t == "component":
             project.parse()
@@ -719,31 +723,80 @@ def main(argv=[]):
                 print (project.parse_status)
                 return (120)
 
-            runenv = os.environ.copy
-
             if not args.dry:               
                 runshow(wt.get_command(command=command, wdir=wdir))
         elif t == "bundle":
             log("Performing {} on bundle {}".format(command, wdir))
-            for component in project.get_bundle(wdir):
+
+            # parse first
+            parse_status = []
+            components = project.get_bundle(wdir)
+            for component in components:
                 project.set_dir(component)
                 project.parse()
                 project.save_outfile()
-
                 if project.parse_status != True:
-                    print (project.parse_status)
-                    return (120)
 
-                runenv = os.environ.copy
+                    parse_status.append(project.parse_status)
+
+            if len(parse_status) > 0:
+                print("\n".join(parse_status))
+                return (120)
+
+            # run terragrunt per component
+            for component in components:                
+
                 log("{} {} {}".format(PACKAGE, command, component))
                 if args.dry:
+                    continue
+
+                if command == "show":
                     continue
 
                 retcode = runshow(wt.get_command(command=command, wdir=component))
 
                 if retcode != 0:
-                    log("Got a non zero return code, stopping bundle")
+                    log("Got a non zero return code running component {}, stopping bundle".format(component))
                     return retcode
+
+            if command in ['apply', "show"]:
+                log("")
+                log("")
+
+                # grab outputs of components
+                out_dict = []
+                wt.set_quiet(False)
+                for component in components:
+                    if args.json:
+                        wt.set_option('-json')
+                    out, err, retcode = run(wt.get_command(command="show", wdir=component), raise_exception_on_fail=True)
+
+                    if args.json:
+                        d = json.loads(out)
+                        out_dict.append({
+                            "component" : component,
+                            "outputs" : d["values"]["outputs"]})
+                    else:
+                        #debug((out, err, retcode))
+                        txt = "| {}".format(component)
+                        print("-" * int(len(txt)+3))
+                        print(txt)
+                        print("-" * int(len(txt)+3))
+                        print("  Outputs:")
+                        print("")
+                        p = False
+                        for line in out.split("\n"):
+
+                            if p:
+                                print("    {}".format(line))
+                            if line.strip().startswith('Outputs:'):
+                                debug("Outputs:; p = True")
+                                p = True
+
+                        print("")
+                if args.json:
+                    print(json.dumps(out_dict, indent=4))
+
         else:
             log("ERROR {}: this directory is neither a component nor a bundle, nothing to do".format(wdir))
             return 130
