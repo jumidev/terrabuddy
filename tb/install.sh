@@ -2,7 +2,7 @@
 
 set -eu
 
-package=oosh
+package=tb
 
 cd "$(dirname $0)"
 chmod +x ${package}.py

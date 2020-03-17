@@ -4,6 +4,7 @@ import json, os, sys, yaml, hcl
 from fuzzywuzzy import fuzz
 import argparse, glob
 from subprocess import Popen, PIPE
+from pyfiglet import Figlet
 
 from collections import OrderedDict
 import re
@@ -11,7 +12,7 @@ import re
 from git import Repo, Remote, InvalidGitRepositoryError
 import time
 
-PACKAGE = "oosh"
+PACKAGE = "tb"
 LOG = True
 DEBUG=False
 
@@ -175,35 +176,35 @@ def git_check(wdir='.'):
         return(-1)
     else:
     
-        OOSH_GIT_DEFAULT_BRANCH = os.getenv('OOSH_GIT_DEFAULT_BRANCH', 'master')
+        TB_GIT_DEFAULT_BRANCH = os.getenv('TB_GIT_DEFAULT_BRANCH', 'master')
         
-        if branch != OOSH_GIT_DEFAULT_BRANCH:
+        if branch != TB_GIT_DEFAULT_BRANCH:
             '''
                 in this case assume we're on a feature branch
                 if the FB is behind master then issue a warning
             '''
-            command = "git -C {} branch -vv | grep {} ".format(git_root, OOSH_GIT_DEFAULT_BRANCH)
+            command = "git -C {} branch -vv | grep {} ".format(git_root, TB_GIT_DEFAULT_BRANCH)
             (origin_master, err, exitcode) = run(command)
             if exitcode != 0:
                 '''
-                In this case the git repo does not contain OOSH_GIT_DEFAULT_BRANCH, so I guess assume that we're 
+                In this case the git repo does not contain TB_GIT_DEFAULT_BRANCH, so I guess assume that we're 
                 on the default branch afterall and that we're up to date persuant to the above code
                 '''
                 return 0
             
             for line in origin_master.split("\n"):
-                if line.strip().startswith(OOSH_GIT_DEFAULT_BRANCH):
+                if line.strip().startswith(TB_GIT_DEFAULT_BRANCH):
                     origin = line.strip().split('[')[1].split('/')[0]
 
             assert origin != None
 
-            command = "git -C {} rev-list --left-right --count \"{}...{}/{}\"".format(git_root, branch, origin, OOSH_GIT_DEFAULT_BRANCH)
+            command = "git -C {} rev-list --left-right --count \"{}...{}/{}\"".format(git_root, branch, origin, TB_GIT_DEFAULT_BRANCH)
             (ahead_behind, err, exitcode) = run(command)
             ahead_behind = ahead_behind.strip().split("\t")
             ahead = int(ahead_behind[0])
             behind = int(ahead_behind.pop())
 
-            command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, OOSH_GIT_DEFAULT_BRANCH)
+            command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, TB_GIT_DEFAULT_BRANCH)
             (ahead_behind, err, exitcode) = run(command)
             ahead_behind = ahead_behind.strip().split("\t")
             local_ahead = int(ahead_behind[0])
@@ -212,16 +213,16 @@ def git_check(wdir='.'):
             
             if behind > 0:
                 sys.stderr.write("")
-                sys.stderr.write("GIT WARNING: Your branch, {}, is {} commit(s) behind {}/{}.\n".format(branch, behind, origin, OOSH_GIT_DEFAULT_BRANCH))
-                sys.stderr.write("This action may clobber new changes that have occurred in {} since your branch was made.\n".format(OOSH_GIT_DEFAULT_BRANCH))
-                sys.stderr.write("It is recommended that you stop now and merge or rebase from {}\n".format(OOSH_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("GIT WARNING: Your branch, {}, is {} commit(s) behind {}/{}.\n".format(branch, behind, origin, TB_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("This action may clobber new changes that have occurred in {} since your branch was made.\n".format(TB_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("It is recommended that you stop now and merge or rebase from {}\n".format(TB_GIT_DEFAULT_BRANCH))
                 sys.stderr.write("\n")
                 
                 if ahead != local_ahead or behind != local_behind:
                     sys.stderr.write("")
-                    sys.stderr.write("INFO: your local {} branch is not up to date with {}/{}\n".format(OOSH_GIT_DEFAULT_BRANCH, origin, OOSH_GIT_DEFAULT_BRANCH))
+                    sys.stderr.write("INFO: your local {} branch is not up to date with {}/{}\n".format(TB_GIT_DEFAULT_BRANCH, origin, TB_GIT_DEFAULT_BRANCH))
                     sys.stderr.write("HINT:")
-                    sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(OOSH_GIT_DEFAULT_BRANCH, branch))
+                    sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(TB_GIT_DEFAULT_BRANCH, branch))
                     sys.stderr.write("\n")
                     
                 answer = raw_input("Do you want to continue anyway? [y/N]? ").lower()
@@ -282,8 +283,8 @@ class WrapTerragrunt():
 class Project():
 
     def __init__(self,
-        git_filtered=os.getenv('OOSH_GIT_FILTER', "False").lower()  in ("on", "true", "1"),
-        conf_marker="oosh.yml",
+        git_filtered=os.getenv('TB_GIT_FILTER', "False").lower()  in ("on", "true", "1"),
+        conf_marker="project.yml",
         inpattern=".hclt",
         dir=os.getcwd()):
 
@@ -319,6 +320,18 @@ class Project():
 
         return only_whitespace
 
+    def check_parsed_file(self):
+        # this function makes sure that self.outstring contains a legit hcl file with a remote state config
+        obj = hcl.loads(self.out_string)
+
+        debug(obj)
+        try:
+            d = obj["remote_state"]
+        except KeyError:
+            return "No remote_state block found"
+
+        return True
+
     def format_hclt_file(self, path):
         log("Formatting {}".format(path))
         only_whitespace = self.check_hclt_file(path)
@@ -329,7 +342,6 @@ class Project():
             with open(path, 'w') as fh:
                 fh.write(out)
                 
-
 
     def example_commands(self, command):
         log("")
@@ -457,9 +469,12 @@ class Project():
                                 self.vars[k] = v
 
     def save_outfile(self):
-        f = "{}/{}".format(self.dir, "terragrunt.hcl")
-        with open(f, 'w') as fh:
+        with open(self.outfile, 'w') as fh:
             fh.write(self.hclfile)
+
+    @property
+    def outfile(self):
+        return "{}/{}".format(self.dir, "terragrunt.hcl")
 
     @property
     def component_path(self):
@@ -479,17 +494,6 @@ class Project():
                     "filename": f,
                     "data" : data
                 }
-
-    @property
-    def oosh_vars_generator(self):
-
-        return """
-        generate "oosh_vars" {
-        path = "oosh_vars.tf"
-        if_exists = "overwrite_terragrunt"
-        contents = <<EOF
-        """+self.tfvars_tf+"\nEOF\n}"
-
 
     @property
     def tfvars_env(self):
@@ -526,7 +530,7 @@ class Project():
         # special vars
         self.vars["COMPONENT_PATH"] = self.component_path
         self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
-        self.vars["OOSH_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
+        self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
 
         self.parse_messages = []
         regex = r"\$\{(.+?)\}"
@@ -594,28 +598,35 @@ class Project():
     @property
     def hclfile(self):
         self.parse()
-        return self.out_string# + "\n" + self.oosh_vars_generator
+        return self.out_string
 
 def main(argv=[]):
 
     epilog = """The following arguments can be activated using environment variables:
 
-    export OOSH_DEBUG=y                   # activates debug messages
-    export OOSH_APPLY=y                   # activates --force
-    export OOSH_APPROVE=y                 # activates --force
-    export OOSH_GIT_CHECK=y               # activates --git-check
-    export OOSH_NO_GIT_CHECK=y            # activates --no-git-check
-    export OOSH_MODULES_PATH              # required if using --dev
+    export TB_DEBUG=y                   # activates debug messages
+    export TB_APPLY=y                   # activates --force
+    export TB_APPROVE=y                 # activates --force
+    export TB_GIT_CHECK=y               # activates --git-check
+    export TB_NO_GIT_CHECK=y            # activates --no-git-check
+    export TB_MODULES_PATH              # required if using --dev
 
     """
     #TGARGS=("--force", "-f", "-y", "--yes", "--clean", "--dev", "--no-check-git")
 
-    parser = argparse.ArgumentParser(description='TG, facilitates calling terragrunt with nifty features n such.', add_help=True, epilog=epilog, formatter_class=argparse.RawTextHelpFormatter)
+    f = Figlet(font='slant')
+
+    parser = argparse.ArgumentParser(description='{}\nTB, facilitates calling terragrunt with nifty features n such.'.format(f.renderText('terrabuddy')),
+    add_help=True,
+    epilog=epilog,
+    formatter_class=argparse.RawTextHelpFormatter)
+
+    #parser.ArgumentParser(usage='Any text you want\n')
 
     # subtle bug in ArgumentParser... nargs='?' doesn't work if you parse something other than sys.argv,
     parser.add_argument('command', default=None, nargs='*', help='terragrunt command to run (apply, destroy, plan, etc)')
 
-    #parser.add_argument('--dev', default=None, help="if in dev mode, which dev module path to reference (OOSH_MODULES_PATH env var must be set and point to your local terragrunt repository path)")
+    #parser.add_argument('--dev', default=None, help="if in dev mode, which dev module path to reference (TB_MODULES_PATH env var must be set and point to your local terragrunt repository path)")
     parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terragrunt and terraform')
 
     # booleans
@@ -631,7 +642,7 @@ def main(argv=[]):
     clear_cache = False
 
     args = parser.parse_args(args=argv)
-    # TODO add project specific args to oosh.yml
+    # TODO add project specific args to project.yml
 
     global LOG
 
@@ -652,13 +663,13 @@ def main(argv=[]):
         # [0:5] to also include "*-all" command variants
         CHECK_GIT = True
 
-    if args.check_git or os.getenv('OOSH_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1']:
+    if args.check_git or os.getenv('TB_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1']:
         CHECK_GIT = True
 
-    if args.no_check_git or os.getenv('OOSH_NO_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1'] :
+    if args.no_check_git or os.getenv('TB_NO_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1'] :
         CHECK_GIT = False
 
-    if args.debug or os.getenv('OOSH_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
+    if args.debug or os.getenv('TB_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
         global DEBUG
         DEBUG = True
 
@@ -710,8 +721,12 @@ def main(argv=[]):
         t = project.component_type(component=wdir)
         if t == "component":
             project.parse()
-
             project.save_outfile()
+            check = project.check_parsed_file()
+            if check != True:
+                print ("An error was found after parsing {}: {}".format(project.outfile, check))
+                return 110
+
 
             if project.parse_status != True:
                 print (project.parse_status)
@@ -721,7 +736,7 @@ def main(argv=[]):
                 runshow(wt.get_command(command=command, wdir=wdir))
         elif t == "bundle":
             log("Performing {} on bundle {}".format(command, wdir))
-
+            log("")
             # parse first
             parse_status = []
             components = project.get_bundle(wdir)
@@ -759,10 +774,14 @@ def main(argv=[]):
 
                 # grab outputs of components
                 out_dict = []
-                wt.set_quiet(False)
+                
+                # fresh instance of WrapTerragrunt to clear out any options from above that might conflict with show
+                wt = WrapTerragrunt()
+                if args.json:
+                    wt.set_option('-json')
+
                 for component in components:
-                    if args.json:
-                        wt.set_option('-json')
+
                     out, err, retcode = run(wt.get_command(command="show", wdir=component), raise_exception_on_fail=True)
 
                     if args.json:
@@ -771,22 +790,32 @@ def main(argv=[]):
                             "component" : component,
                             "outputs" : d["values"]["outputs"]})
                     else:
-                        #debug((out, err, retcode))
-                        txt = "| {}".format(component)
-                        print("-" * int(len(txt)+3))
-                        print(txt)
-                        print("-" * int(len(txt)+3))
-                        print("  Outputs:")
-                        print("")
+                        debug((out, err, retcode))
+
+                        lines = []
+
                         p = False
                         for line in out.split("\n"):
 
                             if p:
-                                print("    {}".format(line))
+                                lines.append("    {}".format(line))
                             if line.strip().startswith('Outputs:'):
                                 debug("Outputs:; p = True")
                                 p = True
 
+                        txt = "| {}".format(component)
+                        print("-" * int(len(txt)+3))
+                        print(txt)
+                        print("-" * int(len(txt)+3))
+
+                        if len(lines) > 0:
+                            print("  Outputs:")
+                            print("")
+                            for line in lines:
+                                print(line)
+
+                        else:
+                            print("No remote state found")
                         print("")
                 if args.json:
                     print(json.dumps(out_dict, indent=4))
@@ -819,7 +848,7 @@ def get_terragrunt_download_dir():
         self.set_tg_option("--terragrunt-download-dir {}".format(get_terragrunt_download_dir()))
 
 
-        OOSH_BIN = self.get_terragrunt_bin(WDIR)
+        TB_BIN = self.get_terragrunt_bin(WDIR)
         TF_BIN = self.get_terraform_bin(WDIR)
         self.set_tg_option("--terragrunt-tfpath {}".format(TF_BIN))
 
@@ -840,7 +869,7 @@ def get_terragrunt_download_dir():
             if which == "terraform":
                 return self.TF_BIN
             else:
-                return self.OOSH_BIN
+                return self.TB_BIN
 
         else:
             if self.command[-4:] == "-all":
