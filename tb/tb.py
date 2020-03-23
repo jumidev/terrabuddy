@@ -320,7 +320,7 @@ class Project():
 
         return only_whitespace
 
-    def check_parsed_file(self):
+    def check_parsed_file(self, require_remote_state_block=True):
         # this function makes sure that self.outstring contains a legit hcl file with a remote state config
         obj = hcl.loads(self.out_string)
 
@@ -328,7 +328,8 @@ class Project():
         try:
             d = obj["remote_state"]
         except KeyError:
-            return "No remote_state block found"
+            if require_remote_state_block:
+                return "No remote_state block found."
 
         return True
 
@@ -633,10 +634,12 @@ def main(argv=[]):
     parser.add_argument('--clean', dest='clean', action='store_true', help='clear all cache')
     parser.add_argument('--force', '--yes', '-t', '-f', action='store_true', help='Perform terragrunt action without asking for confirmation (same as --terragrunt-non-interactive)')
     parser.add_argument('--dry', action='store_true', help="dry run, don't actually do anything")
+    parser.add_argument('--allow-no-remote-state', action='store_true', help="allow components to be run without a remote state block")
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
     parser.add_argument('--check-git', action='store_true', help='Explicitly enable git repository checks')
     parser.add_argument('--quiet', action='store_true', help='suppress output except fatal errors')
     parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
+    parser.add_argument('--list', action='store_true', help='list components in project')
     parser.add_argument('--debug', action='store_true', help='display debug messages')
 
     clear_cache = False
@@ -652,7 +655,19 @@ def main(argv=[]):
 
     # grab args
     
+    project = Project()
+    wt = WrapTerragrunt()
+
+    if args.downstream_args != None:
+        wt.set_option(args.downstream_args)
+
     if len(args.command) < 2:
+
+        if args.list:
+            for which, component in project.get_components():     
+                print(component)
+            return 0
+
         log("ERROR: no command specified, see help")
         return(-1)
     else:
@@ -680,9 +695,6 @@ def main(argv=[]):
             return gitstatus
 
 
-    project = Project()
-    wt = WrapTerragrunt()
-
     #TODO add "env" command to show the env vars with optional --export command for exporting to bash env vars
 
     if command == "format":
@@ -690,7 +702,7 @@ def main(argv=[]):
             if filename.endswith('.hclt'):
                 project.format_hclt_file("{}/{}".format(dirpath, filename))
 
-    if command in ("plan", "apply", "destroy", "refresh", "show"):
+    if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock"):
 
         try:
             wdir = os.path.relpath(args.command[2])
@@ -722,7 +734,7 @@ def main(argv=[]):
         if t == "component":
             project.parse()
             project.save_outfile()
-            check = project.check_parsed_file()
+            check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
             if check != True:
                 print ("An error was found after parsing {}: {}".format(project.outfile, check))
                 return 110
@@ -752,6 +764,10 @@ def main(argv=[]):
                 print("\n".join(parse_status))
                 return (120)
 
+            if command == "destroy":
+                # destroy in opposite order
+                components.reverse()
+
             # run terragrunt per component
             for component in components:                
 
@@ -768,7 +784,7 @@ def main(argv=[]):
                     log("Got a non zero return code running component {}, stopping bundle".format(component))
                     return retcode
 
-            if command in ['apply', "show"]:
+            if command in ['apply', "show"] and not args.dry:
                 log("")
                 log("")
 
@@ -777,6 +793,9 @@ def main(argv=[]):
                 
                 # fresh instance of WrapTerragrunt to clear out any options from above that might conflict with show
                 wt = WrapTerragrunt()
+                if args.downstream_args != None:
+                    wt.set_option(args.downstream_args)
+
                 if args.json:
                     wt.set_option('-json')
 
@@ -829,83 +848,3 @@ def main(argv=[]):
 if __name__ == '__main__':
     retcode = main(sys.argv)
     exit(retcode)
-
-
-"""
-
-def get_terragrunt_download_dir():
-    terragrunt_dl_dir = " ~/.terragrunt"
-    try:
-        terragrunt_dl_dir = os.environ['TERRAGRUNT_DOWNLOAD_DIR']
-    except:
-        pass
-    return terragrunt_dl_dir
-
-
-
-
-
-        self.set_tg_option("--terragrunt-download-dir {}".format(get_terragrunt_download_dir()))
-
-
-        TB_BIN = self.get_terragrunt_bin(WDIR)
-        TF_BIN = self.get_terraform_bin(WDIR)
-        self.set_tg_option("--terragrunt-tfpath {}".format(TF_BIN))
-
-
-    def get_bin(self, which, wdir):
-        if not os.path.isdir(os.path.abspath(wdir)):
-            raise Exception("ERROR: {} is not a dir".format(wdir))
-        elif os.path.isfile(wdir + "/" + "terraform.tfvars"):
-            if which == "terraform":
-                debug("{} requires terraform@0.11".format(wdir))
-                return self.TF011_BIN
-            else:
-                debug("{} requires terragrunt@0.18".format(wdir))
-                return self.TG018_BIN
-
-        elif os.path.isfile(wdir + "/" + "terragrunt.hcl"):
-
-            if which == "terraform":
-                return self.TF_BIN
-            else:
-                return self.TB_BIN
-
-        else:
-            if self.command[-4:] == "-all":
-                # scan every subdir looking for modules to tell us what version to use :)
-                answers = []
-                for i in os.listdir(wdir):
-                    p = "{}/{}".format(wdir, i)
-                    if os.path.isdir(p):
-                        try:
-                            answers.append(self.get_bin(which, p))
-                        except:
-                            pass
-
-                if len(answers) == 0:
-                    raise Exception("ERROR: No modules found in {}".format(wdir))
-
-                # turning into a set makes the values unique
-                if len(set(answers)) == 1:
-                    # only one unique answer
-                    return answers[0]
-
-                # if you make it here then LOL
-                raise Exception("ERROR: Cannot run {} in {}.  Some modules contain newer terragrunt.hcl files whereas others have the old style terraform.tfvars.  You must run individual {} commands.".format(self.command, wdir, self.command.split('-')[0]))
-
-            else:
-                raise Exception("ERROR: {} is not a module".format(wdir))
-
-
-
-
-
-    def get_terragrunt_bin(self, wdir):
-        return self.get_bin("terragrunt", wdir)
-
-    def get_terraform_bin(self, wdir):
-        return self.get_bin("terraform", wdir)
-
-
-"""
