@@ -283,7 +283,7 @@ class WrapTerragrunt():
 class Project():
 
     def __init__(self,
-        git_filtered=os.getenv('TB_GIT_FILTER', "False").lower()  in ("on", "true", "1"),
+        git_filtered=False,
         conf_marker="project.yml",
         inpattern=".hclt",
         dir=os.getcwd()):
@@ -606,12 +606,11 @@ def main(argv=[]):
     epilog = """The following arguments can be activated using environment variables:
 
     export TB_DEBUG=y                   # activates debug messages
-    export TB_APPLY=y                   # activates --force
-    export TB_APPROVE=y                 # activates --force
+    export TB_APPROVE=y                 # activates --yes
     export TB_GIT_CHECK=y               # activates --git-check
     export TB_NO_GIT_CHECK=y            # activates --no-git-check
     export TB_MODULES_PATH              # required if using --dev
-
+    export TB_GIT_FILTER                # when displaying components, only show those which have uncomitted git files
     """
     #TGARGS=("--force", "-f", "-y", "--yes", "--clean", "--dev", "--no-check-git")
 
@@ -637,6 +636,7 @@ def main(argv=[]):
     parser.add_argument('--allow-no-remote-state', action='store_true', help="allow components to be run without a remote state block")
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
     parser.add_argument('--check-git', action='store_true', help='Explicitly enable git repository checks')
+    parser.add_argument('--git-filter', action='store_true', help='when displaying components, only show those which have uncomitted files in them.')
     parser.add_argument('--quiet', action='store_true', help='suppress output except fatal errors')
     parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
     parser.add_argument('--list', action='store_true', help='list components in project')
@@ -654,8 +654,11 @@ def main(argv=[]):
         LOG = False
 
     # grab args
-    
-    project = Project()
+
+    git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
+    force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
+
+    project = Project(git_filtered=git_filtered)
     wt = WrapTerragrunt()
 
     if args.downstream_args != None:
@@ -717,7 +720,6 @@ def main(argv=[]):
         
         project.set_dir(wdir)
 
-        force = args.force
 
         # -auto-approve and refresh do not mix
         if command in ["refresh"]:
