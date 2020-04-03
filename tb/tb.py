@@ -23,13 +23,20 @@ def anyof(needles, haystack):
 
     return False
 
+def stylelog(s):
+    s = s.replace("<b>", "\033[1m")
+    s = s.replace("<u>", "\033[4m")
+    s = s.replace("</u>", "\033[0;0m")
+    s = s.replace("</b>", "\033[0;0m")
+    return s
+
 def log(s):
     if LOG == True:
-        print (s)
+        print (stylelog(s))
 
 def debug(s):
     if DEBUG == True:
-        print (s)
+        print (stylelog(s))
 
 def run(cmd, splitlines=False, env=os.environ, raise_exception_on_fail=False):
     # you had better escape cmd cause it's goin to the shell as is
@@ -347,8 +354,13 @@ class Project():
     def example_commands(self, command):
         log("")
 
-        for which, component in self.get_components():     
-            log("{} {} {}".format(PACKAGE, command, component))
+        for which, component in self.get_components():   
+            
+            s = "{} {} {}".format(PACKAGE, command, component)
+            if which == "bundle":
+                s = "{} {} <u><b>{}</u>".format(PACKAGE, command, component)
+
+            log(s)
         log("")
         
     def get_project_root(self, dir=".", fallback_to_git=True):
@@ -710,7 +722,7 @@ def main(argv=[]):
         try:
             wdir = os.path.relpath(args.command[2])
         except:
-            log("OOPS, no component specified, try one of these:")
+            log("OOPS, no component specified, try one of these (bundles are <u><b>bold underlined</b>):")
             project.example_commands(command)
             return(100)
 
