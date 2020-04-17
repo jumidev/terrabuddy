@@ -24,4 +24,5 @@ unlink  ${package} || true
 ln -s ${dir}/${package}.py ${package}
 cd -
 
-echo "Installation successful"
+echo "Installation successful, if you want to enable the handy shell aliases, add this line to your ~/.bashrc:"
+echo 'eval $(tb --shell-aliases)'

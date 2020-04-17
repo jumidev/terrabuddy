@@ -652,6 +652,7 @@ def main(argv=[]):
     parser.add_argument('--quiet', action='store_true', help='suppress output except fatal errors')
     parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
     parser.add_argument('--list', action='store_true', help='list components in project')
+    parser.add_argument('--shell-aliases', action='store_true', help='Export a list of handy aliases to the shell.  Can be added to ~./bashrc')
     parser.add_argument('--debug', action='store_true', help='display debug messages')
 
     clear_cache = False
@@ -665,6 +666,14 @@ def main(argv=[]):
     if args.quiet or args.json:
         LOG = False
 
+    if args.shell_aliases:
+        print("""
+            alias tby="export TB_APPROVE=true" # enable --yes argument
+            alias tbn="export TB_APPROVE=false" # disable --yes argument
+            alias tbgf="export TB_GIT_FILTER=true" # enable --git-filter
+            alias tbgfn="export TB_GIT_FILTER=false" # disable --git-filter
+            """)
+        exit(0)
     # grab args
 
     git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
