@@ -1,28 +1,67 @@
-#!/usr/bin/env bash
+#!/bin/env bash
 
 set -eu
 
+cd $(dirname $0)
+
+SRC_DIR=$(pwd)
 package=tb
 
-cd "$(dirname $0)"
-chmod +x ${package}.py
+if [ -z ${TARGET_DIR+x} ] ; then
+	TARGET_DIR=$(echo $PATH | tr ":" "\n" | grep $HOME | head -n 1) 
 
-echo "Installing dependencies"
+	if [ `whoami` = "root" ] ; then
+		TARGET_DIR=/usr/bin
+	fi
+fi
 
-pip3 install --user -r ./requirements.txt
-dir=$(pwd)
+deps () {
+    echo "Installing dependencies"
 
-echo ""
-echo "Where should I put the symbolic link?"
-echo ""
+	if [ `whoami` = "root" ] ; then
+		pip3 install -r ./requirements.txt
+    else
+        pip3 install --user -r ./requirements.txt
+	fi
+    
+}
 
-read -e -p "Enter path and press [ENTER]: " -i ~/bin lsdir
-cd $lsdir
+install () {
+  	echo installing into $TARGET_DIR
 
-unlink  ${package} || true
+	cd $TARGET_DIR
 
-ln -s ${dir}/${package}.py ${package}
-cd -
+	cp $SRC_DIR/${package}.py ${package}
 
-echo "Installation successful, if you want to enable the handy shell aliases, add this line to your ~/.bashrc:"
-echo 'eval $(tb --shell-aliases)'
+	chmod +x ${package}
+}
+
+uninstall () {
+  	echo uninstalling from $TARGET_DIR
+	cd $TARGET_DIR
+ 	unlink ${package} || rm -f ${package}
+}
+
+
+install_dev () {
+    echo ""
+    echo "Where should I put the symbolic link?"
+    echo ""
+
+    read -e -p "Enter path and press [ENTER]: " -i $TARGET_DIR TARGET_DIR
+    cd $TARGET_DIR
+
+    unlink  ${package} || rm -f ${package} || true
+
+    ln -s ${SRC_DIR}/${package}.py ${package}
+    cd -
+
+}
+
+test () {
+	set -x
+	echo $TARGET_DIR
+	echo $SRC_DIR
+}
+
+"$@"
