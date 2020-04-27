@@ -24,10 +24,11 @@ def anyof(needles, haystack):
     return False
 
 def stylelog(s):
-    s = s.replace("<b>", "\033[1m")
-    s = s.replace("<u>", "\033[4m")
-    s = s.replace("</u>", "\033[0;0m")
-    s = s.replace("</b>", "\033[0;0m")
+    if type(s) is str:
+        s = s.replace("<b>", "\033[1m")
+        s = s.replace("<u>", "\033[4m")
+        s = s.replace("</u>", "\033[0;0m")
+        s = s.replace("</b>", "\033[0;0m")
     return s
 
 def log(s):
@@ -91,6 +92,7 @@ def flatwalk_up(haystack, needle):
             results.append((folder, fn))
 
     for (folder, fn) in results: 
+        debug ((folder, fn))
         yield (folder, fn)
 
 def flatwalk(path):
@@ -241,6 +243,44 @@ def git_check(wdir='.'):
             
         return 0
 
+
+class NoRemoteState(Exception):
+    pass
+
+class RemoteStateKeyNotFound(Exception):
+    pass
+
+class RemoteStates():
+
+    def __init__(self):
+        self.components = {}
+
+    def fetch(self, component):
+        if component not in self.components.values():
+            wt = WrapTerragrunt()
+
+            wt.set_option('-json')
+            wt.set_option('-no-color')
+            (out, err, exitcode) = run(wt.get_command(command="show", wdir=component))
+            if exitcode == 0:
+                d = json.loads(out)
+                try:
+                    self.components[component] = d["values"]["outputs"]
+                except KeyError:
+                    raise NoRemoteState("ERROR: No remote state found for component {}".format(component))
+  
+    def value(self, component, key):
+        self.fetch(component)
+        
+        try:
+            value = self.components[component][key]["value"]
+        except KeyError:
+            msg = "ERROR: State key \"{}\" not found in component {}\nKey must be one of: {}".format(key, component, ", ".join(self.components[component].keys()))
+            raise RemoteStateKeyNotFound(msg)
+
+        return value
+
+
 class WrapTerragrunt():
 
     def __init__(self):
@@ -303,6 +343,7 @@ class Project():
         self.components = None
         self.git_filtered = git_filtered
         self.conf_marker = conf_marker
+        self.remotestates = None
 
     def set_dir(self, dir):
         self.dir=dir
@@ -462,16 +503,16 @@ class Project():
             self.check_hclt_file(f)
 
     def get_files(self):
-        git_root = self.get_project_root(self.dir)
-        for (folder, fn) in flatwalk_up(git_root, self.dir):
+        project_root = self.get_project_root(self.dir)
+        for (folder, fn) in flatwalk_up(project_root, self.dir):
             if fn.endswith(self.inpattern):
                 yield "{}/{}".format(folder, fn)
 
     def get_yml_vars(self):
         if self.vars == None:
-            git_root = self.get_project_root(self.dir)
+            project_root = self.get_project_root(self.dir)
             self.vars={}
-            for (folder, fn) in flatwalk_up(git_root, self.dir):
+            for (folder, fn) in flatwalk_up(project_root, self.dir):
                 if fn.endswith('.yml'):
 
                     with open(r'{}/{}'.format(folder, fn)) as fh:
@@ -480,6 +521,15 @@ class Project():
                         for k,v in d.items():
                             if type(v) in (str, int, float):
                                 self.vars[k] = v
+
+            # now for every value that starts with rspath(...), parse
+            for k,v in self.vars.items():
+                if v.startswith("rspath(") and v.endswith(")"):
+                    txt = self.parsetext(v[7:-1])
+                    (component, key) = txt.split(":")
+                    if self.remotestates == None:
+                        self.remotestates = RemoteStates()
+                    self.vars[k] = self.remotestates.value(component, key)
 
     def save_outfile(self):
         with open(self.outfile, 'w') as fh:
@@ -532,6 +582,18 @@ class Project():
 
         return "\n".join(out)
 
+    def parsetext(self, s):
+
+        # self.vars
+        for (k, v) in  self.vars.items():
+            s = s.replace('${' + k + '}', v)
+
+        # ENV VARS
+        for (k, v) in  os.environ.items():
+            s = s.replace('${' + k + '}', v)
+
+        return s
+
     def parse(self):
 
         self.check_hclt_files()
@@ -549,14 +611,7 @@ class Project():
         regex = r"\$\{(.+?)\}"
 
         for fn,d in self.templates.items():
-            # self.vars
-            for (k, v) in  self.vars.items():
-                d['data'] = d['data'].replace('${' + k + '}', v)
-
-            # ENV VARS
-            for (k, v) in  os.environ.items():
-                d['data'] = d['data'].replace('${' + k + '}', v)
-
+            d['data'] = self.parsetext(d['data'])
 
             # now make sure that all vars have been replaced
             # exclude commented out lines from check
@@ -640,6 +695,7 @@ def main(argv=[]):
 
     #parser.add_argument('--dev', default=None, help="if in dev mode, which dev module path to reference (TB_MODULES_PATH env var must be set and point to your local terragrunt repository path)")
     parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terragrunt and terraform')
+    parser.add_argument('--key', default=None, help='optional remote state key to return')
 
     # booleans
     parser.add_argument('--clean', dest='clean', action='store_true', help='clear all cache')
@@ -649,7 +705,7 @@ def main(argv=[]):
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
     parser.add_argument('--check-git', action='store_true', help='Explicitly enable git repository checks')
     parser.add_argument('--git-filter', action='store_true', help='when displaying components, only show those which have uncomitted files in them.')
-    parser.add_argument('--quiet', action='store_true', help='suppress output except fatal errors')
+    parser.add_argument('--quiet', "-q", action='store_true', help='suppress output except fatal errors')
     parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
     parser.add_argument('--list', action='store_true', help='list components in project')
     parser.add_argument('--shell-aliases', action='store_true', help='Export a list of handy aliases to the shell.  Can be added to ~./bashrc')
@@ -725,8 +781,8 @@ def main(argv=[]):
         for (dirpath, filename) in flatwalk('.'):
             if filename.endswith('.hclt'):
                 project.format_hclt_file("{}/{}".format(dirpath, filename))
-
-    if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock"):
+    
+    if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock", "parse"):
 
         try:
             wdir = os.path.relpath(args.command[2])
@@ -740,7 +796,6 @@ def main(argv=[]):
             return -1
         
         project.set_dir(wdir)
-
 
         # -auto-approve and refresh do not mix
         if command in ["refresh"]:
@@ -757,18 +812,30 @@ def main(argv=[]):
         if t == "component":
             project.parse()
             project.save_outfile()
+
+            if command == "parse":
+                # we have parsed, our job here is done
+                return 0
             check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
             if check != True:
                 print ("An error was found after parsing {}: {}".format(project.outfile, check))
                 return 110
 
-
             if project.parse_status != True:
                 print (project.parse_status)
                 return (120)
 
-            if not args.dry:               
-                runshow(wt.get_command(command=command, wdir=wdir))
+            if args.key != None:
+                rs = RemoteStates()
+                print(rs.value(wdir, args.key))
+                return 0
+            else:
+                if args.json:
+                    wt.set_option('-json')
+                    wt.set_option('-no-color')
+
+                if not args.dry:               
+                    runshow(wt.get_command(command=command, wdir=wdir))
         elif t == "bundle":
             log("Performing {} on bundle {}".format(command, wdir))
             log("")
@@ -786,6 +853,10 @@ def main(argv=[]):
             if len(parse_status) > 0:
                 print("\n".join(parse_status))
                 return (120)
+
+            if command == "parse":
+                # we have parsed, our job here is done
+                return 0
 
             if command == "destroy":
                 # destroy in opposite order
@@ -821,6 +892,7 @@ def main(argv=[]):
 
                 if args.json:
                     wt.set_option('-json')
+                    wt.set_option('-no-color')
 
                 for component in components:
 
