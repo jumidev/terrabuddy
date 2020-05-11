@@ -748,10 +748,6 @@ class Project():
 
 def main(argv=[]):
 
-    # u = Utils()
-    # print (u.check_terraformrc())
-    # return
-
     epilog = """The following arguments can be activated using environment variables:
 
     export TB_DEBUG=y                   # activates debug messages
@@ -790,7 +786,8 @@ def main(argv=[]):
     parser.add_argument('--quiet', "-q", action='store_true', help='suppress output except fatal errors')
     parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
     parser.add_argument('--list', action='store_true', help='list components in project')
-    parser.add_argument('--shell-aliases', action='store_true', help='Export a list of handy aliases to the shell.  Can be added to ~./bashrc')
+    parser.add_argument('--setup-shell', action='store_true', help='Export a list of handy aliases to the shell.  Can be added to ~./bashrc')
+    parser.add_argument('--setup-terraformrc', action='store_true', help='Setup sane terraformrc defaults')
     parser.add_argument('--debug', action='store_true', help='display debug messages')
 
     clear_cache = False
@@ -804,7 +801,23 @@ def main(argv=[]):
     if args.quiet or args.json:
         LOG = False
 
-    if args.shell_aliases:
+    if args.setup_terraformrc:
+        try:
+            with open(os.path.expanduser('~/.terraformrc'), 'r') as fh:
+                bashrc = fh.readlines()
+        except:
+            bashrc = []
+
+        lines = ['plugin_cache_dir = "$HOME/.terraform.d/plugin-cache"']
+
+        with open(os.path.expanduser('~/.terraformrc'), "a") as fh:  
+            for l in lines:
+                l = "{}\n".format(l)
+                if l not in bashrc:
+                    fh.write(l)
+        exit(0)
+
+    if args.setup_shell:
         with open(os.path.expanduser('~/.bashrc'), 'r') as fh:
             bashrc = fh.readlines()
 
