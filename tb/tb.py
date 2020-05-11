@@ -327,6 +327,47 @@ class WrapTerragrunt():
         debug("running command:\n{}".format(cmd))
         return cmd
 
+
+class Utils():
+
+    def __init__(self):
+        self.wants = {
+            "plugin_cache_dir" : '$HOME/.terraform.d/plugin-cache'
+        }
+        self.rcfile =  os.path.expanduser(os.getenv('TERRAFORM_RCFILE',"~/.terraformrc"))
+
+    def check_terraformrc(self):
+
+        problems = []
+        if os.path.isfile(self.rcfile):
+            with open(self.rcfile, 'r') as fh:
+                obj = hcl.load(fh)
+            for k,v in self.wants.items():
+                if k not in obj:
+                    problems.append("NOKEY_{}".format(k))
+
+        else:
+            problems.append("NOFILE")
+        
+        return problems
+
+    def setup_terraformrc(self):
+        problems = self.check_terraformrc()
+
+        if "NOFILE" in problems:
+            fh = open(self.rcfile, "w")
+        else:
+            fh = open(self.rcfile, "a")
+
+        for k in problems:
+            if k.startswith("NOKEY_"):
+                k2 = k[6:]
+                fh.write("\n{} = {}".format(k2, self.wants))
+
+
+class ErrorParsingYmlVars(Exception):
+    pass
+
 class Project():
 
     def __init__(self,
@@ -395,13 +436,13 @@ class Project():
     def example_commands(self, command):
         log("")
 
-        for which, component in self.get_components():   
-            
-            s = "{} {} {}".format(PACKAGE, command, component)
-            if which == "bundle":
-                s = "{} {} <u><b>{}</u>".format(PACKAGE, command, component)
+        for which, component, match in self.get_components():   
+            if match:
+                s = "{} {} {}".format(PACKAGE, command, component)
+                if which == "bundle":
+                    s = "{} {} <u><b>{}</u>".format(PACKAGE, command, component)
 
-            log(s)
+                log(s)
         log("")
         
     def get_project_root(self, dir=".", fallback_to_git=True):
@@ -443,18 +484,17 @@ class Project():
                             if f.startswith(dirpath):
                                 match = True
                                 break
-                        if match:
-                            self.components.append((which, dirpath))
+                        self.components.append((which, dirpath, match))
 
                     else:
-                        self.components.append((which, dirpath))
+                        self.components.append((which, dirpath, True))
         
         return self.components
     
 
 
     def component_type(self, component, dir='.'):
-        for which, c in self.get_components(dir=dir):
+        for which, c, match in self.get_components(dir=dir):
             if c == component:
                 return which
 
@@ -468,7 +508,7 @@ class Project():
             debug("")
             debug("get_bundle wdir {}".format(wdir))
             wdir = os.path.relpath(wdir[0:-1])
-            for which, c in self.get_components():
+            for which, c, match in self.get_components():
                 if c.startswith(wdir):
                     components.append(c)
 
@@ -510,6 +550,7 @@ class Project():
 
     def get_yml_vars(self):
         if self.vars == None:
+            var_sources = {}
             project_root = self.get_project_root(self.dir)
             self.vars={}
             for (folder, fn) in flatwalk_up(project_root, self.dir):
@@ -521,6 +562,38 @@ class Project():
                         for k,v in d.items():
                             if type(v) in (str, int, float):
                                 self.vars[k] = v
+                                var_sources[k] =  '{}/{}'.format(folder, fn)
+
+            # special vars
+            self.vars["PROJECT_ROOT"] = project_root
+            self.vars["COMPONENT_PATH"] = self.component_path
+            self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
+            self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
+
+            # parse item values
+            for i in range(10):
+                for k,v in self.vars.items():
+                    if "${" in  v:
+                        self.vars[k] = self.parsetext(v)
+
+            problems = []
+
+            for k,v in self.vars.items():
+                if "${" in  v:
+                    msg = self.check_parsed_text(v)
+                    if msg != "":
+                        problems.append("File {}, cannot parse value of \"{}\"".format(os.path.relpath(var_sources[k]), k))
+                        for line in msg.split("\n"):
+                            problems.append(line)
+
+            if len(problems) > 0:
+
+                for line in problems:
+                    if line != "":
+                        sys.stderr.write("\n"+line)
+                sys.stderr.write("\n")
+                sys.stderr.write("\n")
+                raise ErrorParsingYmlVars(" ".join(problems))
 
             # now for every value that starts with rspath(...), parse
             for k,v in self.vars.items():
@@ -558,29 +631,29 @@ class Project():
                     "data" : data
                 }
 
-    @property
-    def tfvars_env(self):
-        self.get_yml_vars()
-        en = {}
+    # @property
+    # def tfvars_env(self):
+    #     self.get_yml_vars()
+    #     en = {}
 
-        # self.vars
-        for (k, v) in  self.vars.items():
-            en['TF_VAR_{}'.format(k)] = v
+    #     # self.vars
+    #     for (k, v) in  self.vars.items():
+    #         en['TF_VAR_{}'.format(k)] = v
 
-        # ENV VARS
-        for (k, v) in  os.environ.items():
-            en['TF_VAR_{}'.format(k)] = v
+    #     # ENV VARS
+    #     for (k, v) in  os.environ.items():
+    #         en['TF_VAR_{}'.format(k)] = v
 
-        return en
+    #     return en
 
-    @property
-    def tfvars_tf(self):
-        out = []
-        for (k,v) in self.tfvars_env.items():
-            s = "variable \"{}\" ".format(k[7:]) + '{default = ""}'
-            out.append(s)
+    # @property
+    # def tfvars_tf(self):
+    #     out = []
+    #     for (k,v) in self.tfvars_env.items():
+    #         s = "variable \"{}\" ".format(k[7:]) + '{default = ""}'
+    #         out.append(s)
 
-        return "\n".join(out)
+    #     return "\n".join(out)
 
     def parsetext(self, s):
 
@@ -594,7 +667,53 @@ class Project():
 
         return s
 
-    def parse(self):
+    def check_parsed_text(self, s):
+        regex = r"\$\{(.+?)\}"
+
+        # now make sure that all vars have been replaced
+        # exclude commented out lines from check
+        linenum = 0
+        msg = ""
+        lines = s.split("\n")
+        for line in lines:
+            linenum += 1
+            try:
+                if line.strip()[0] != '#':
+
+                    matches = re.finditer(regex, line)
+
+                    for matchNum, match in enumerate(matches):
+                        miss = match.group()
+
+                        if len(lines) > 1:
+                            msg += "line {}:".format(linenum)
+                        msg += "\n   No substitution found for {}".format(miss)
+
+                        lim = 80
+                        near_matches = {}
+                        for k in self.vars.keys():
+                            ratio = fuzz.ratio(miss, k)
+                            if ratio >= lim:
+                                near_matches[k] = ratio
+
+                        for k in os.environ.keys():
+                            ratio = fuzz.ratio(miss, k)
+                            if ratio >= lim:
+                                near_matches[k] = ratio
+
+                        for k,ratio in near_matches.items():
+                            msg += "\n   ==>  Perhaps you meant ${"+k+"}?"
+
+                        msg += "\n"
+
+            except IndexError: # an empty line has no first character ;)
+                pass
+
+        #debug(msg)
+        return msg
+
+
+    def parse_template(self):
 
         self.check_hclt_files()
         self.get_yml_vars()
@@ -602,57 +721,16 @@ class Project():
 
         self.out_string=u""
 
-        # special vars
-        self.vars["COMPONENT_PATH"] = self.component_path
-        self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
-        self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
-
         self.parse_messages = []
-        regex = r"\$\{(.+?)\}"
 
         for fn,d in self.templates.items():
-            d['data'] = self.parsetext(d['data'])
+            parsed = self.parsetext(d['data'])
+            msg = self.check_parsed_text(parsed)
+            if msg != "":
+                self.parse_messages.append("File: {}".format(os.path.relpath(d['filename'])))
+                self.parse_messages.append(msg)
 
-            # now make sure that all vars have been replaced
-            # exclude commented out lines from check
-            linenum = 0
-            msg = None
-            for line in d['data'].split("\n"):
-                linenum += 1
-                try:
-                    if line.strip()[0] != '#':
-
-                        matches = re.finditer(regex, line)
-
-                        for matchNum, match in enumerate(matches):
-                            miss = match.group()
-
-                            msg = "{} line {}:".format(d['filename'], linenum)
-                            msg += "\n   No substitution found for {}".format(miss)
-
-                            lim = 80
-                            near_matches = {}
-                            for k in self.vars.keys():
-                                ratio = fuzz.ratio(miss, k)
-                                if ratio >= lim:
-                                    near_matches[k] = ratio
-
-                            for k in os.environ.keys():
-                                ratio = fuzz.ratio(miss, k)
-                                if ratio >= lim:
-                                    near_matches[k] = ratio
-
-                            for k,ratio in near_matches.items():
-                                msg += "\n   ==>  Perhaps you meant ${"+k+"}?"
-
-                            msg += "\n"
-                            self.parse_messages.append(msg)
-
-                except IndexError: # an empty line has no first character ;)
-                    pass
-         
-
-            self.out_string += d['data']
+            self.out_string += parsed
             self.out_string += "\n"
 
     @property
@@ -665,10 +743,14 @@ class Project():
 
     @property
     def hclfile(self):
-        self.parse()
+        self.parse_template()
         return self.out_string
 
 def main(argv=[]):
+
+    # u = Utils()
+    # print (u.check_terraformrc())
+    # return
 
     epilog = """The following arguments can be activated using environment variables:
 
@@ -723,12 +805,20 @@ def main(argv=[]):
         LOG = False
 
     if args.shell_aliases:
-        print("""
-            alias tby="export TB_APPROVE=true" # enable --yes argument
-            alias tbn="export TB_APPROVE=false" # disable --yes argument
-            alias tbgf="export TB_GIT_FILTER=true" # enable --git-filter
-            alias tbgfn="export TB_GIT_FILTER=false" # disable --git-filter
-            """)
+        with open(os.path.expanduser('~/.bashrc'), 'r') as fh:
+            bashrc = fh.readlines()
+
+        lines = (
+            "alias tby='export TB_APPROVE=true'",
+            "alias tbn='export TB_APPROVE=false'",
+            "alias tbgf='export TB_GIT_FILTER=true'",
+            "alias tbgfn='export TB_GIT_FILTER=false'")
+
+        with open(os.path.expanduser('~/.bashrc'), "a") as fh:  
+            for l in lines:
+                l = "{}\n".format(l)
+                if l not in bashrc:
+                    fh.write(l)
         exit(0)
     # grab args
 
@@ -744,7 +834,7 @@ def main(argv=[]):
     if len(args.command) < 2:
 
         if args.list:
-            for which, component in project.get_components():     
+            for which, component, match in project.get_components():     
                 print(component)
             return 0
 
@@ -782,7 +872,14 @@ def main(argv=[]):
             if filename.endswith('.hclt'):
                 project.format_hclt_file("{}/{}".format(dirpath, filename))
     
-    if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock", "parse"):
+    # if command == "parse":
+    #     try:
+    #         wdir = os.path.relpath(args.command[2])
+    #     except:
+    #         # no component provided, loop over all and parse them
+
+
+    if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock", "parse", "showvars"):
 
         try:
             wdir = os.path.relpath(args.command[2])
@@ -797,8 +894,8 @@ def main(argv=[]):
         
         project.set_dir(wdir)
 
-        # -auto-approve and refresh do not mix
-        if command in ["refresh"]:
+        # -auto-approve and refresh|plan do not mix
+        if command in ["refresh", "plan"]:
             force = False
 
         if force:
@@ -810,21 +907,36 @@ def main(argv=[]):
 
         t = project.component_type(component=wdir)
         if t == "component":
-            project.parse()
+            project.parse_template()
             project.save_outfile()
 
-            if command == "parse":
-                # we have parsed, our job here is done
+            if command == "showvars":
+                if args.json:
+                    print (json.dumps(project.vars, indent=4))
+                else:
+                    keys = list(project.vars.keys())#.sorted()
+                    keys.sort()
+                    for k in keys:
+                        print ("{}={}".format(k, project.vars[k]))
+                    #print(json.dumps(project.vars, indent=4))
                 return 0
-            check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
-            if check != True:
-                print ("An error was found after parsing {}: {}".format(project.outfile, check))
-                return 110
+
 
             if project.parse_status != True:
                 print (project.parse_status)
                 return (120)
 
+            if command == "parse":
+                # we have parsed, our job here is done
+                return 0
+
+            check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
+            if check != True:
+                print ("An error was found after parsing {}: {}".format(project.outfile, check))
+                return 110
+
+
+                
             if args.key != None:
                 rs = RemoteStates()
                 print(rs.value(wdir, args.key))
@@ -844,7 +956,7 @@ def main(argv=[]):
             components = project.get_bundle(wdir)
             for component in components:
                 project.set_dir(component)
-                project.parse()
+                project.parse_template()
                 project.save_outfile()
                 if project.parse_status != True:
 
