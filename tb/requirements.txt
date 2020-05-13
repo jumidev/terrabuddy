@@ -4,5 +4,5 @@ pyhcl
 pyfiglet
 fuzzywuzzy
 python-Levenshtein
-
+requests
 gitpython
