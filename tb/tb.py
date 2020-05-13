@@ -448,7 +448,7 @@ class Project():
 
             for (dirpath, filename) in flatwalk('.'):
                 dirpath = dirpath[2:]
-                if filename in ['terragrunt.hclt', "bundle.yml"] and len(dirpath) > 0:
+                if filename in ['inputs.hclt', "bundle.yml"] and len(dirpath) > 0:
                     which = "component"
                     if filename == "bundle.yml":
                         which = "bundle"
