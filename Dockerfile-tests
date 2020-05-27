@@ -1,0 +1,15 @@
+FROM python:slim-buster
+
+RUN apt update -y &&  apt install -y build-essential make git
+
+ADD tb/requirements.txt /
+
+RUN pip install -r /requirements.txt
+RUN pip install pytest
+
+ADD tb /tb/
+ADD tests /tests/
+
+WORKDIR /tests
+
+CMD ["make", "test"]

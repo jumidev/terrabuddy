@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 
 import json, os, sys, yaml, hcl, zipfile
 from fuzzywuzzy import fuzz
@@ -342,6 +343,9 @@ class WrapTerragrunt():
 class ErrorParsingYmlVars(Exception):
     pass
 
+class HclParseException(Exception):
+    pass
+
 class Project():
 
     def __init__(self,
@@ -379,7 +383,7 @@ class Project():
                 try:
                     obj = hcl.load(fp)
                 except:
-                    raise Exception("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
+                    raise HclParseException("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
 
         return only_whitespace
 
@@ -431,7 +435,7 @@ class Project():
         if oneup != "/":
             return self.get_project_root(oneup, fallback_to_git)
         
-        raise "Could not find a project root directory"
+        raise Exception("Could not find a project root directory")
 
    # def get_filtered_components(wdir, filter):
 
@@ -532,17 +536,21 @@ class Project():
 
                     with open(r'{}/{}'.format(folder, fn)) as fh:
                         d = yaml.load(fh, Loader=yaml.FullLoader)
-
-                        for k,v in d.items():
-                            if type(v) in (str, int, float):
-                                self.vars[k] = v
-                                var_sources[k] =  '{}/{}'.format(folder, fn)
+                        if type(d) == dict:
+                            for k,v in d.items():
+                                if type(v) in (str, int, float):
+                                    self.vars[k] = v
+                                    var_sources[k] =  '{}/{}'.format(folder, fn)
 
             # special vars
             self.vars["PROJECT_ROOT"] = project_root
             self.vars["COMPONENT_PATH"] = self.component_path
             self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
-            self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
+            try:
+                self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
+            except OSError:
+                self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(__file__))
+
 
             # parse item values
             for i in range(10):
@@ -883,6 +891,7 @@ class Utils():
     def check_setup(self, verbose=True, updates=True):
         missing = []
         outofdate = []
+        debug(self.terraform_path)
         out, err, retcode = run("{} --version".format(self.terraform_path))
 
         debug("check setup")
@@ -1073,7 +1082,10 @@ def main(argv=[]):
         DEBUG = True
         log("debug mode enabled")
 
-    u = Utils()
+    u = Utils(
+        terragrunt_path = os.getenv("TERRAGRUNT_BIN", None),
+        terraform_path = os.getenv("TERRAFORM_BIN", None)
+    )
     u.setup(args)
 
     if args.setup_shell or args.setup_terraformrc or args.check_setup  or args.setup:
