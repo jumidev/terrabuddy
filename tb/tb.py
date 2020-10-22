@@ -1082,9 +1082,18 @@ def main(argv=[]):
         DEBUG = True
         log("debug mode enabled")
 
+    (exitcode, path, err) = run("which terraform")
+    terraform_path = None
+    if exitcode == 0:
+        terraform_path = path.strip()
+    (exitcode, path, err) = run("which terragrunt")
+    terragrunt_path = None
+    if exitcode == 0:
+        terragrunt_path = path.strip()
+
     u = Utils(
-        terragrunt_path = os.getenv("TERRAGRUNT_BIN", None),
-        terraform_path = os.getenv("TERRAFORM_BIN", None)
+        terragrunt_path = os.getenv("TERRAGRUNT_BIN", terragrunt_path),
+        terraform_path = os.getenv("TERRAFORM_BIN", terraform_path)
     )
     u.setup(args)
 
