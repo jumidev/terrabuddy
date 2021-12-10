@@ -39,7 +39,7 @@ tb --setup-shell         # (optional) installs useful tb shell aliases
 
 ### Installing terraform modules
 
-terrabuddy requires terraform modules.  Weatherforce provides a repo with modules for Azure, which can be cloned here:
+terrabuddy requires terraform modules.  A repo with modules for Azure is provided here:
 
 `git clone https://github.com/jumidev/terraform-modules-azure.git`
 
