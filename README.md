@@ -4,6 +4,12 @@ Terrabuddy is a templating engine built on top of [terraform](https://www.terraf
 
 Terrabuddy can be used in conjunction with a terragrunt installation.  Alternatively, terragrunt code can be ported to terrabuddy simply by renaming your .hcl files to .htlt
 
+# WHAT!?  Why?
+
+**Doesn't adding more layers on top of terraform just make it more complicated than it already is? 😩** 
+
+The above remarks are correct.  Terragrunt and terrabuddy add two layers above terraform code.  However, this perceived increase in complexity brings many long term benefits.  See [DRY, auditable, modular terraform code.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/)
+
 ### Features
 - easily install and update terraform and terrabuddy
 - easily manage terragrunt component interdependencies via bundles 
@@ -41,7 +47,7 @@ Keep a note of the path into which the above is cloned, this will be used by ter
 
 `tb` is the terrabuddy command line interface.  It facilitates setting up your machine (see installation), allows you to list components and run terraform commands such as **plan**, **apply**, **destroy** and manages shared variables. 
 
-tb introduces three notions for managig resourecs: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and tb knows how to create them in the correct order).
+tb introduces three notions for managing resoureces: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and tb knows how to create them in the correct order).
 
 ## Anatomy of a project:
 
@@ -58,7 +64,7 @@ README.md
 remote_state.hclt
 ```
 
-- Azure contains three environments, `sbx` (sandbox), `prep` (pre-prod), and  `prod`.  These are the top level directories in the project
+- The top level directories in the project correspond to the environments, `sbx` (sandbox), `prep` (pre-prod), and  `prod`.  
 - .envrc.tpl contains a template for required environment variables, notably TF_MODULES_ROOT which points to the repo where terraform-modules-azure has been cloned
 - project.yml contains project-specific variables.  Other .yml files within the project contain 
 - remote_state.hclt is an hcl template that will be applied in all components
