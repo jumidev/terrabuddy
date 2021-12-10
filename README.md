@@ -4,14 +4,17 @@ Terrabuddy is a templating engine built on top of [terraform](https://www.terraf
 
 Terrabuddy can be used in conjunction with a terragrunt installation.  Alternatively, terragrunt code can be ported to terrabuddy simply by renaming your .hcl files to .htlt
 
-# WHAT!?  Why?
+### WHAT!?  Why?
 
 **Doesn't adding more layers on top of terraform just make it more complicated than it already is? 😩** 
 
-The above remarks are correct.  Terragrunt and terrabuddy add two layers above terraform code.  However, this perceived increase in complexity brings many long term benefits.  See [DRY, auditable, modular terraform code.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/)
+The above remark is correct.  Terraform by its self can present a steep learning curve, tempting devops to write quick and dirty solutions, because they have better things to do.    However, terraform done quick and dirty turns into technical debt.
 
-### Features
-- easily install and update terraform and terrabuddy
+While adding two layers on top of terraform brings a *perceived* increase in complexity, its goal is to ultimately bring *long term benefits.*  Seriously, see [DRY, auditable, modular terraform code.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/)
+
+
+### Terrabuddy Features
+- easily install and update terraform and terrabuddy binaries
 - easily manage terragrunt component interdependencies via bundles 
 - easily inject variables into your terragrunt modules
 - built in git workflow support
