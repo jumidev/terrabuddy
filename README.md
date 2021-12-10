@@ -19,7 +19,7 @@ Terrabuddy can be used in conjunction with a terragrunt installation.  Alternati
 - python3 with pip3 in your $PATH
 
 ```
-git clone https://github.com/weatherforce/terrabuddy.git
+git clone https://github.com/jumidev/terrabuddy.git
 cd terrabuddy/tb
 make install             # installs the tb CLI tool with python requirements
 
@@ -32,7 +32,7 @@ tb --setup-shell         # (optional) installs useful tb shell aliases
 
 terrabuddy requires terraform modules.  Weatherforce provides a repo with modules for Azure, which can be cloned here:
 
-`git clone https://github.com/weatherforce/terraform-modules-azure.git`
+`git clone https://github.com/jumidev/terraform-modules-azure.git`
 
 Keep a note of the path into which the above is cloned, this will be used by terrabuddy via the TF_MODULES_ROOT env var
 
@@ -44,6 +44,8 @@ Keep a note of the path into which the above is cloned, this will be used by ter
 tb introduces three notions for managig resourecs: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and tb knows how to create them in the correct order).
 
 ## Anatomy of a project:
+
+Below is an example project encompassing three environments
 
 ```
 prep/
