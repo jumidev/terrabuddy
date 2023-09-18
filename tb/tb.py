@@ -1329,6 +1329,9 @@ def main(argv=[]):
             return 130
             
 
+def cli_entrypoint():
+    retcode = main(sys.argv)
+    exit(retcode)
 
 if __name__ == '__main__':
     retcode = main(sys.argv)

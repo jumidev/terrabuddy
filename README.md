@@ -1,8 +1,6 @@
 # terrabuddy
 
-Terrabuddy is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html) and [terragrunt](https://terragrunt.gruntwork.io/).  Terragrunt allows terraform to be used in a way that is [more DRY, more auditable, and more modular.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/).  Terrabuddy goes the last kilometer by adding templating, variables, auto complete, and commands to set up your environment more quickly.
-
-Terrabuddy can be used in conjunction with a terragrunt installation.  Alternatively, terragrunt code can be ported to terrabuddy simply by renaming your .hcl files to .htlt
+Terrabuddy is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html).  Terrabuddy allows terraform to be used in a way that is [more DRY, more auditable, and more modular.]
 
 ### WHAT!?  Why?
 
@@ -10,13 +8,13 @@ Terrabuddy can be used in conjunction with a terragrunt installation.  Alternati
 
 The above remark is correct.  Terraform by its self can present a steep learning curve, tempting devops to write quick and dirty solutions, because they have better things to do.    However, terraform done quick and dirty turns into technical debt.
 
-While adding two layers on top of terraform brings a *perceived* increase in complexity, its goal is to ultimately bring *long term benefits.*  Seriously, see [DRY, auditable, modular terraform code.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/)
+While adding a layer on top of terraform brings a *perceived* increase in complexity, its goal is to ultimately bring *long term benefits.*  Seriously, see [DRY, auditable, modular terraform code.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/)
 
 
 ### Terrabuddy Features
-- easily install and update terraform and terrabuddy binaries
-- easily manage terragrunt component interdependencies via bundles 
-- easily inject variables into your terragrunt modules
+- easily install and update terraform binaries
+- easily manage component interdependencies via bundles 
+- easily inject variables into your modules
 - built in git workflow support
 
 
@@ -24,15 +22,17 @@ While adding two layers on top of terraform brings a *perceived* increase in com
 
 ### System Requirements
 
-- Linux only (for now)
 - python3 with pip3 in your $PATH
+- `pip install terrabuddy`
+
+**or install using setup.py**
 
 ```
 git clone https://github.com/jumidev/terrabuddy.git
 cd terrabuddy/tb
 make install             # installs the tb CLI tool with python requirements
 
-tb --setup               # downloads and installs terraform and terragrunt
+tb --setup               # downloads and installs terraform
 tb --setup-terraformrc   # (optional) installs useful terraform default settings
 tb --setup-shell         # (optional) installs useful tb shell aliases
 ```
@@ -68,7 +68,7 @@ remote_state.hclt
 ```
 
 - The top level directories in the project correspond to the environments, `sbx` (sandbox), `prep` (pre-prod), and  `prod`.  
-- .envrc.tpl contains a template for required environment variables, notably TF_MODULES_ROOT which points to the repo where terraform-modules-azure has been cloned
+- .envrc.tpl contains a template for required environment variables, notably TF_MODULES_ROOT which points to the repo in to which terraform-modules-azure has been cloned
 - project.yml contains project-specific variables.  Other .yml files within the project contain 
 - remote_state.hclt is an hcl template that will be applied in all components
 
