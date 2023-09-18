@@ -338,3 +338,12 @@ For instance, developers A and B work on two unrelated components.
 `GIT ERROR: You are on branch master and are behind the remote.  Please git pull and/or merge before proceeding.  Below is a git status:...`
 
 The above also works for feature branches.  If developer B is working on a feature branch that was made prior to developer A's changes (pushed to master branch), tb will detect that Developer B's FB is behind master and prompt them to merge before proceeding.
+
+# TODO
+
+- remove terragrunt dependency
+    - predictable temp dirs in home dir
+    - auto cleanup previous runs older than x days
+    - auto manage remote states, 
+    - enrypted remote states
+- example spoke and hub architecture 
