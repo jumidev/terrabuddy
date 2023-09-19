@@ -264,7 +264,7 @@ class RemoteStates():
     def fetch(self, component):
         if component not in self.components.values():
             u = Utils()
-            wt = WrapTerragrunt(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
+            wt = WrapTerraform(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
 
             wt.set_option('-json')
             wt.set_option('-no-color')
@@ -288,18 +288,15 @@ class RemoteStates():
         return value
 
 
-class WrapTerragrunt():
+class WrapTerraform():
 
-    def __init__(self, terragrunt_path=None, terraform_path=None):
+    def __init__(self, terraform_path=None):
 
-        if terragrunt_path == None:
-            terragrunt_path = os.getenv("TERRAGRUNT_BIN", "terragrunt")
         if terraform_path == None:
             terraform_path = os.getenv("TERRAFORM_BIN", "terraform")
 
-        self.tg_bin = terragrunt_path
         self.tf_bin = terraform_path
-        self.terragrunt_options = []
+        self.cli_options = []
         self.quiet = False
 
 
@@ -309,29 +306,19 @@ class WrapTerragrunt():
         return  os.path.expanduser('~/.{}_cache/{}'.format(package_name, hashlib.sha224(cache_slug).hexdigest()))
 
     def set_option(self, option):
-        self.terragrunt_options.append(option)
+        self.cli_options.append(option)
 
     def set_quiet(self, which=True):
         self.quiet = which
 
-    def get_download_dir(self):
-        return os.getenv('TERRAGRUNT_DOWNLOAD_DIR',"~/.terragrunt")
-
-    def set_iam_role(self, iam_role):
-        self.set_option("--terragrunt-iam-role {} ".format(iam_role))
-
     def get_command(self, command, wdir=".", var_file=None, extra_args=[]):
-
-        self.set_option("--terragrunt-download-dir {}".format(self.get_download_dir()))
-        # path to terraform
-        self.set_option("--terragrunt-tfpath {}".format(self.tf_bin))
 
         if var_file != None:
             var_file = "-var-file={}".format(var_file)
         else:
             var_file = ""
 
-        cmd = "{} {} --terragrunt-source-update --terragrunt-working-dir {} {} {} {} ".format(self.tg_bin, command, wdir, var_file, " ".join(set(self.terragrunt_options)), " ".join(extra_args))
+        cmd = "{} {} {} {} ".format(self.tf_bin, command, wdir, var_file, " ".join(set(self.cli_options)), " ".join(extra_args))
         
         if self.quiet:
             cmd += " > /dev/null 2>&1 "
@@ -1021,6 +1008,7 @@ class Utils():
                         fh.write(l)
             log("SETUP SHELL: OK")
 
+
 def main(argv=[]):
 
     epilog = """The following arguments can be activated using environment variables:
@@ -1036,7 +1024,7 @@ def main(argv=[]):
 
     f = Figlet(font='slant')
 
-    parser = argparse.ArgumentParser(description='{}\nTB, facilitates calling terragrunt with nifty features n such.'.format(f.renderText('terrabuddy')),
+    parser = argparse.ArgumentParser(description='{}\nTB, facilitates terraform with nifty features n such.'.format(f.renderText('terrabuddy')),
     add_help=True,
     epilog=epilog,
     formatter_class=argparse.RawTextHelpFormatter)
@@ -1044,15 +1032,15 @@ def main(argv=[]):
     #parser.ArgumentParser(usage='Any text you want\n')
 
     # subtle bug in ArgumentParser... nargs='?' doesn't work if you parse something other than sys.argv,
-    parser.add_argument('command', default=None, nargs='*', help='terragrunt command to run (apply, destroy, plan, etc)')
+    parser.add_argument('command', default=None, nargs='*', help='command to run (apply, destroy, plan, etc)')
 
     #parser.add_argument('--dev', default=None, help="if in dev mode, which dev module path to reference (TB_MODULES_PATH env var must be set and point to your local terragrunt repository path)")
-    parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terragrunt and terraform')
+    parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terraform')
     parser.add_argument('--key', default=None, help='optional remote state key to return')
 
     # booleans
     parser.add_argument('--clean', dest='clean', action='store_true', help='clear all cache')
-    parser.add_argument('--force', '--yes', '-t', '-f', action='store_true', help='Perform terragrunt action without asking for confirmation (same as --terragrunt-non-interactive)')
+    parser.add_argument('--force', '--yes', '-t', '-f', action='store_true', help='Perform action without asking for confirmation (same as -auto-approve)')
     parser.add_argument('--dry', action='store_true', help="dry run, don't actually do anything")
     parser.add_argument('--allow-no-remote-state', action='store_true', help="allow components to be run without a remote state block")
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
@@ -1061,8 +1049,8 @@ def main(argv=[]):
     parser.add_argument('--quiet', "-q", action='store_true', help='suppress output except fatal errors')
     parser.add_argument('--json', action='store_true', help='When applicable, output in json format')
     parser.add_argument('--list', action='store_true', help='list components in project')
-    parser.add_argument('--setup', action='store_true', help='Install terraform and terragrunt')
-    parser.add_argument('--check-setup', action='store_true', help='Check if terraform and terragrunt are up to date')
+    parser.add_argument('--setup', action='store_true', help='Install terraform')
+    parser.add_argument('--check-setup', action='store_true', help='Check if terraform is up to date')
     parser.add_argument('--setup-shell', action='store_true', help='Export a list of handy aliases to the shell.  Can be added to ~./bashrc')
     parser.add_argument('--setup-terraformrc', action='store_true', help='Setup sane terraformrc defaults')
     parser.add_argument('--debug', action='store_true', help='display debug messages')
@@ -1086,13 +1074,8 @@ def main(argv=[]):
     terraform_path = None
     if exitcode == 0:
         terraform_path = path.strip()
-    (exitcode, path, err) = run("which terragrunt")
-    terragrunt_path = None
-    if exitcode == 0:
-        terragrunt_path = path.strip()
 
     u = Utils(
-        terragrunt_path = os.getenv("TERRAGRUNT_BIN", terragrunt_path),
         terraform_path = os.getenv("TERRAFORM_BIN", terraform_path)
     )
     u.setup(args)
@@ -1106,7 +1089,7 @@ def main(argv=[]):
     force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
     project = Project(git_filtered=git_filtered)
-    wt = WrapTerragrunt(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
+    wt = WrapTerraform(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
 
     if args.downstream_args != None:
         wt.set_option(args.downstream_args)
@@ -1275,8 +1258,8 @@ def main(argv=[]):
                 # grab outputs of components
                 out_dict = []
                 
-                # fresh instance of WrapTerragrunt to clear out any options from above that might conflict with show
-                wt = WrapTerragrunt(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
+                # fresh instance of WrapTerraform to clear out any options from above that might conflict with show
+                wt = WrapTerraform(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
                 if args.downstream_args != None:
                     wt.set_option(args.downstream_args)
 
