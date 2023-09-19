@@ -264,7 +264,7 @@ class RemoteStates():
     def fetch(self, component):
         if component not in self.components.values():
             u = Utils()
-            wt = WrapTerraform(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
+            wt = WrapTerraform(terraform_path=u.terraform_path)
 
             wt.set_option('-json')
             wt.set_option('-no-color')
@@ -745,8 +745,7 @@ class Utils():
         print("")
 
         
-    def __init__(self, terraform_path=None, terragrunt_path=None):
-        self.terragrunt_v =  None
+    def __init__(self, terraform_path=None):
         self.terraform_v = None
 
         conf_file = "{}/config.hcl".format(self.conf_dir)
@@ -767,29 +766,8 @@ class Utils():
 
         self.terraform_path = terraform_path
 
-        if terragrunt_path == None:
-            terragrunt_path = "{}/terragrunt".format(self.bin_dir)
-            if not os.path.isdir(self.bin_dir):
-                os.makedirs(self.bin_dir)
-
-        self.terragrunt_path = terragrunt_path
-
         if not os.path.isdir(self.conf_dir):
             os.makedirs(self.conf_dir)
-
-
-    def terragrunt_currentversion(self):
-        if self.terragrunt_v == None:
-            response = requests.get('https://github.com/gruntwork-io/terragrunt/releases/latest')
-            
-            for resp in response.history:
-                loc = resp.headers['Location']
-
-            latest = loc.split("/").pop(-1)
-            self.terragrunt_v = (latest, loc)
-
-        return self.terragrunt_v
-
 
     def terraform_currentversion(self):
         if self.terraform_v == None:
@@ -828,7 +806,7 @@ class Utils():
         debug("outofdate={}".format(outofdate))
 
         if len(missing)+len(outofdate) == 0:
-            log("SETUP, Nothing to do. terraform and terragrunt installed and up to date")
+            log("SETUP, Nothing to do. terraform installed and up to date")
         else:
             if "terraform" in missing:
                 log("Installing terraform")
@@ -836,14 +814,6 @@ class Utils():
             elif "terraform" in outofdate and update:
                 log("Updating terraform")
                 self.install_terraform()
-
-            if "terragrunt" in missing:
-                debug('"terragrunt" in missing')
-                log("Installing terragrunt")
-                self.install_terragrunt()
-            elif "terragrunt" in outofdate and update:
-                log("Updating terragrunt")
-                self.install_terragrunt()
 
 
     def install_terraform(self, version=None):
@@ -859,21 +829,6 @@ class Utils():
             
         os.chmod(self.terraform_path, 500) # make executable
         os.unlink(self.terraform_path+".zip") # delete zip
-
-    def install_terragrunt(self, version=None):
-        # https://github.com/gruntwork-io/terragrunt/releases/download/v0.23.16/terragrunt_linux_amd64
-        currentver, loc = self.terragrunt_currentversion()
-        if version == None:
-            version = currentver
-        url = "https://github.com/gruntwork-io/terragrunt/releases/download/{}/terragrunt_linux_amd64".format(version)
-
-        log("Downloading terragrunt {} to {}...".format(version, self.terragrunt_path))
-        Utils.download_progress(url, self.terragrunt_path)
-
-        os.chmod(self.terragrunt_path, 500) # make executable
-
-        log("DONE")
-
 
     def check_setup(self, verbose=True, updates=True):
         missing = []
@@ -892,30 +847,6 @@ class Utils():
             outofdate.append("terraform")
             if verbose:
                 log("Your version of terraform is out of date! You can update by running 'tb --setup', or by manually downloading from https://www.terraform.io/downloads.html")
-
-
-        out, err, retcode = run("{} --version".format(self.terragrunt_path))
-
-        debug((out, err, retcode))
-        if retcode == 127:
-            missing.append("terragrunt")
-            if verbose:
-                log("terragrunt not installed, you can download it from https://github.com/gruntwork-io/terragrunt/releases")
-
-        elif retcode == 0 and updates:
-            installedver = ""
-            for line in out.split("\n"):
-                if "terragrunt version" in line:
-                    line = line.replace('terragrunt version', "").strip()
-
-                    installedver = line
-                    break
-
-            currentver, loc = self.terragrunt_currentversion()
-            if installedver != currentver:
-                outofdate.append("terragrunt")
-                if verbose:
-                    log("Your version of Terragrunt is out of date! The latest version \nis {}. You can update by running 'tb --setup', or by mually downloading from {}".format(currentver, loc))
 
         return (missing, outofdate)
 
@@ -955,7 +886,7 @@ class Utils():
 
 
     def setup(self, args):
-        debug("setup terragrunt")
+        debug("setup")
 
         if args.setup:
             self.install()
@@ -969,7 +900,7 @@ class Utils():
             elif len(outdated) > 0:
                 log("CHECK SETUP: UPDATES AVAILABLE")
             else:
-                log("terraform and terragrunt installed and up to date")
+                log("terraform installed and up to date")
 
         else:
             # auto check once every 8 hours
@@ -1034,7 +965,6 @@ def main(argv=[]):
     # subtle bug in ArgumentParser... nargs='?' doesn't work if you parse something other than sys.argv,
     parser.add_argument('command', default=None, nargs='*', help='command to run (apply, destroy, plan, etc)')
 
-    #parser.add_argument('--dev', default=None, help="if in dev mode, which dev module path to reference (TB_MODULES_PATH env var must be set and point to your local terragrunt repository path)")
     parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terraform')
     parser.add_argument('--key', default=None, help='optional remote state key to return')
 
@@ -1089,7 +1019,7 @@ def main(argv=[]):
     force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
     project = Project(git_filtered=git_filtered)
-    wt = WrapTerraform(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
+    wt = WrapTerraform(terraform_path=u.terraform_path)
 
     if args.downstream_args != None:
         wt.set_option(args.downstream_args)
@@ -1160,7 +1090,6 @@ def main(argv=[]):
             force = False
 
         if force:
-            wt.set_option("--terragrunt-non-interactive")
             wt.set_option("-auto-approve")
 
         if args.quiet:
@@ -1235,7 +1164,7 @@ def main(argv=[]):
                 # destroy in opposite order
                 components.reverse()
 
-            # run terragrunt per component
+            # run terraform per component
             for component in components:                
 
                 log("{} {} {}".format(PACKAGE, command, component))
@@ -1259,7 +1188,7 @@ def main(argv=[]):
                 out_dict = []
                 
                 # fresh instance of WrapTerraform to clear out any options from above that might conflict with show
-                wt = WrapTerraform(terraform_path=u.terraform_path, terragrunt_path=u.terragrunt_path)
+                wt = WrapTerraform(terraform_path=u.terraform_path)
                 if args.downstream_args != None:
                     wt.set_option(args.downstream_args)
 
