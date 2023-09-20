@@ -7,7 +7,7 @@ import argparse, glob, tempfile
 from subprocess import Popen, PIPE
 from pyfiglet import Figlet
 import requests
-
+import datetime
 from collections import OrderedDict
 import re
 
@@ -344,12 +344,10 @@ class Project():
     def __init__(self,
         git_filtered=False,
         conf_marker="project.yml",
-        inpattern=".hclt",
-        dir=os.getcwd(),
-        tf_wdir=None):
+        inpattern=".hclt"):
 
         self.inpattern=inpattern
-        self.dir=dir
+        self.component_dir=None
         self.vars=None
         self.parse_messages = []
 
@@ -357,10 +355,12 @@ class Project():
         self.git_filtered = git_filtered
         self.conf_marker = conf_marker
         self.remotestates = None
-        self.tf_wdir = tf_wdir
 
-    def set_dir(self, dir):
-        self.dir=dir
+    def set_tf_dir(self, dir):
+        self.tf_dir = dir
+
+    def set_component_dir(self, dir):
+        self.component_dir=dir
         self.vars = None
 
     def check_hclt_file(self, path):
@@ -382,7 +382,7 @@ class Project():
 
         return only_whitespace
 
-    def check_parsed_file(self, require_remote_state_block=True):
+    def check_parsed_file(self, require_remote_state_block=False):
         # this function makes sure that self.outstring contains a legit hcl file with a remote state config
         obj = hcl.loads(self.out_string)
 
@@ -515,17 +515,17 @@ class Project():
             self.check_hclt_file(f)
 
     def get_files(self):
-        project_root = self.get_project_root(self.dir)
-        for (folder, fn) in flatwalk_up(project_root, self.dir):
+        project_root = self.get_project_root(self.component_dir)
+        for (folder, fn) in flatwalk_up(project_root, self.component_dir):
             if fn.endswith(self.inpattern):
                 yield "{}/{}".format(folder, fn)
 
     def get_yml_vars(self):
         if self.vars == None:
             var_sources = {}
-            project_root = self.get_project_root(self.dir)
+            project_root = self.get_project_root(self.component_dir)
             self.vars={}
-            for (folder, fn) in flatwalk_up(project_root, self.dir):
+            for (folder, fn) in flatwalk_up(project_root, self.component_dir):
                 if fn.endswith('.yml'):
 
                     with open(r'{}/{}'.format(folder, fn)) as fh:
@@ -580,12 +580,8 @@ class Project():
                         self.remotestates = RemoteStates()
                     self.vars[k] = self.remotestates.value(component, key)
 
-    def clean_wdir_cache(self):
-        d = self.root_wdir
-        delfiles(d, 30)
-
     def setup_wdir(self):
-        print(self.hclfile)
+        debug(self.hclfile)
 
 
     def save_outfile(self):
@@ -594,23 +590,18 @@ class Project():
 
     @property
     def outfile(self):
-        return "{}/{}".format(self.dir, "component.hcl")
+        return "{}/{}".format(self.root_wdir, "component.hcl")
 
     @property
     def component_path(self):
-        abswdir = os.path.abspath(self.dir)
-        absroot = self.get_project_root(self.dir)
+        abswdir = os.path.abspath(self.component_dir)
+        absroot = self.get_project_root(self.component_dir)
 
         return abswdir[len(absroot)+1:]
 
-
-
     @property
     def root_wdir(self):
-        tf_wdir =  self.tf_wdir
-        if tf_wdir == None:
-            tf_wdir = os.path.expanduser("~/.cache/terrabuddy/wdir/")
-
+        tf_wdir =  self.tf_dir
         if not os.path.isdir(tf_wdir):
             os.makedirs(tf_wdir)
 
@@ -782,16 +773,18 @@ class ComponentSourceGit(ComponentSource):
 
         try:
             if "branch" in self.args:
-                Repo.clone_from(self.args["repo"], t, branch=self.args["branch"])
+                Repo.clone_from(self.args["repo"], t, branch=self.args["branch"], depth=1)
             else:
-                Repo.clone_from(self.args["repo"], t)
+                Repo.clone_from(self.args["repo"], t, depth=1)
         except:
+            shutil.rmtree(t)
             raise ComponentSourceException("Error cloning git repo {}".format(self.args["repo"]))
         
         if "path" in self.args:
 
             subdir = "{}/{}".format(t, self.args["path"])
             if not os.path.isdir(subdir):
+                shutil.rmtree(t)
                 raise ComponentSourceException("No such path {} in repo: {}".format(self.args["path"], self.args["repo"]))
 
             shutil.copytree(subdir, self.targetdir, dirs_exist_ok=True)
@@ -799,6 +792,8 @@ class ComponentSourceGit(ComponentSource):
         else:
             shutil.copytree(t, self.targetdir, dirs_exist_ok=True)
     
+        shutil.rmtree(t)
+
 
 class Utils():
 
@@ -1160,17 +1155,39 @@ def main(argv=[]):
     if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock", "parse", "showvars"):
 
         try:
-            wdir = os.path.relpath(args.command[2])
+            cdir = os.path.relpath(args.command[2])
         except:
             log("OOPS, no component specified, try one of these (bundles are <u><b>bold underlined</b>):")
             project.example_commands(command)
             return(100)
 
-        if not os.path.isdir(wdir):
-            log("ERROR: {} is not a directory".format(wdir))
+        if not os.path.isdir(cdir):
+            log("ERROR: {} is not a directory".format(cdir))
             return -1
         
-        project.set_dir(wdir)
+        project.set_component_dir(cdir)
+
+        #here we make tf working dir
+        tf_wdir = os.getenv("TG_WORKING_DIR", None)
+
+        if tf_wdir == None:
+            current_date_slug = datetime.date.today().strftime('%Y-%m-%d')
+            cdir_slug = cdir.replace('/', '_')
+
+            tf_wdir_root = os.path.expanduser('~/.cache/terrabuddy/wdir')
+            tf_wdir_d = '{}/{}'.format(tf_wdir_root, current_date_slug)
+            tf_wdir = '{}/{}/{}'.format(tf_wdir_d, cdir_slug,  str(time.time()))
+
+
+            if not os.path.isdir(tf_wdir_d):
+                # first time today tb has been run, clean up past cache
+                delfiles(tf_wdir_root, 30)
+
+            if not os.path.isdir(tf_wdir):
+                os.makedirs(tf_wdir)
+
+        debug("setting tf_wdir to {}".format(tf_wdir))
+        project.set_tf_dir(tf_wdir)
 
         # -auto-approve and refresh|plan do not mix
         if command in ["refresh", "plan"]:
@@ -1182,10 +1199,10 @@ def main(argv=[]):
         if args.quiet:
             wt.set_quiet()
 
-        t = project.component_type(component=wdir)
+        t = project.component_type(component=cdir)
         if t == "component":
             project.parse_template()
-            project.setup_wdir()
+            project.setup_wdir() # invoke componentsource
             project.save_outfile()
 
             if command == "showvars":
@@ -1199,7 +1216,6 @@ def main(argv=[]):
                     #print(json.dumps(project.vars, indent=4))
                 return 0
 
-
             if project.parse_status != True:
                 print (project.parse_status)
                 return (120)
@@ -1208,16 +1224,14 @@ def main(argv=[]):
                 # we have parsed, our job here is done
                 return 0
 
-            check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
-            if check != True:
-                print ("An error was found after parsing {}: {}".format(project.outfile, check))
-                return 110
+            # check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
+            # if check != True:
+            #     print ("An error was found after parsing {}: {}".format(project.outfile, check))
+            #     return 110
 
-
-                
             if args.key != None:
                 rs = RemoteStates()
-                print(rs.value(wdir, args.key))
+                print(rs.value(cdir, args.key))
                 return 0
             else:
                 if args.json:
@@ -1225,17 +1239,28 @@ def main(argv=[]):
                     wt.set_option('-no-color')
 
                 if not args.dry:
-                    cmd =  wt.get_command(command=command, wdir=wdir)
+
+                    instanciate ComponentSource
+                    fetch into tf_wdir
+                    extract inputs into tfvars
+                    terraform init
+                    get tfstate
+
+                    terraform plan apply
+
+                    save tfstate
+
+                    cmd =  wt.get_command(command=command, wdir=cdir)
                     debug("cmd = {}".format(cmd))           
                     runshow(cmd)
         elif t == "bundle":
-            log("Performing {} on bundle {}".format(command, wdir))
+            log("Performing {} on bundle {}".format(command, cdir))
             log("")
             # parse first
             parse_status = []
-            components = project.get_bundle(wdir)
+            components = project.get_bundle(cdir)
             for component in components:
-                project.set_dir(component)
+                project.set_component_dir(component)
                 project.parse_template()
                 project.save_outfile()
                 if project.parse_status != True:
@@ -1328,7 +1353,7 @@ def main(argv=[]):
                     print(json.dumps(out_dict, indent=4))
 
         else:
-            log("ERROR {}: this directory is neither a component nor a bundle, nothing to do".format(wdir))
+            log("ERROR {}: this directory is neither a component nor a bundle, nothing to do".format(cdir))
             return 130
             
 

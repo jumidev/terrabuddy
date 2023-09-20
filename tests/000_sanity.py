@@ -46,9 +46,9 @@ class TestTbSanity(unittest.TestCase):
         retcode = tb.main(["tb", "plan"])
         assert retcode == 100
 
-    def test_missing_remote_state_block(self):
-        retcode = tb.main(["tb", "plan", "mock/goodhclt", "--key", "COMPONENT_DIRNAME"])
-        assert retcode == 110
+    # def test_missing_remote_state_block(self):
+    #     retcode = tb.main(["tb", "plan", "mock/goodhclt", "--key", "COMPONENT_DIRNAME"])
+    #     assert retcode == 110
 
     def test_parse_missingvars(self):
         retcode = tb.main(["tb", "parse", "mock/withvars/missingvars"])
