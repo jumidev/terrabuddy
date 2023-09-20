@@ -299,10 +299,9 @@ class WrapTerraform():
         self.cli_options = []
         self.quiet = False
 
-
     def get_cache_dir(ymlfile, package_name):
         cache_slug = os.path.abspath(ymlfile)
-        debug(cache_slug)
+        debug("cache_slug = {}".format(cache_slug))
         return  os.path.expanduser('~/.{}_cache/{}'.format(package_name, hashlib.sha224(cache_slug).hexdigest()))
 
     def set_option(self, option):
@@ -310,6 +309,9 @@ class WrapTerraform():
 
     def set_quiet(self, which=True):
         self.quiet = which
+
+    def setup_wdir_env(self):
+        pass
 
     def get_command(self, command, wdir=".", var_file=None, extra_args=[]):
 
@@ -439,7 +441,7 @@ class Project():
 
             for (dirpath, filename) in flatwalk('.'):
                 dirpath = dirpath[2:]
-                if filename in ['inputs.hclt', "bundle.yml"] and len(dirpath) > 0:
+                if filename in ['component.hclt', "bundle.yml"] and len(dirpath) > 0:
                     which = "component"
                     if filename == "bundle.yml":
                         which = "bundle"
@@ -579,7 +581,7 @@ class Project():
 
     @property
     def outfile(self):
-        return "{}/{}".format(self.dir, "terragrunt.hcl")
+        return "{}/{}".format(self.dir, "component.hcl")
 
     @property
     def component_path(self):
@@ -1136,8 +1138,10 @@ def main(argv=[]):
                     wt.set_option('-json')
                     wt.set_option('-no-color')
 
-                if not args.dry:               
-                    runshow(wt.get_command(command=command, wdir=wdir))
+                if not args.dry:
+                    cmd =  wt.get_command(command=command, wdir=wdir)
+                    debug("cmd = {}".format(cmd))           
+                    runshow(cmd)
         elif t == "bundle":
             log("Performing {} on bundle {}".format(command, wdir))
             log("")
@@ -1174,6 +1178,7 @@ def main(argv=[]):
                 if command == "show":
                     continue
 
+                debug("run terraform per component")
                 retcode = runshow(wt.get_command(command=command, wdir=component))
 
                 if retcode != 0:

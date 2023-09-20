@@ -1,8 +1,8 @@
-terragrunt.hcl
 __pycache__
 *.pyc
 .pytest_cache
 venv
+component.hcl
 
 *.egg-info/
 .installed.cfg

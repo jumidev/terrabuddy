@@ -8,7 +8,7 @@ Terrabuddy is a templating engine built on top of [terraform](https://www.terraf
 
 The above remark is correct.  Terraform by its self can present a steep learning curve, tempting devops to write quick and dirty solutions, because they have better things to do.    However, terraform done quick and dirty turns into technical debt.
 
-While adding a layer on top of terraform brings a *perceived* increase in complexity, its goal is to ultimately bring *long term benefits.*  Seriously, see [DRY, auditable, modular terraform code.](https://terragrunt.gruntwork.io/docs/features/keep-your-terraform-code-dry/)
+While adding a layer on top of terraform brings a *perceived* increase in complexity, its goal is to ultimately bring *long term benefits.* 
 
 
 ### Terrabuddy Features
@@ -74,15 +74,21 @@ remote_state.hclt
 
 ## Anatomy of a component:
 
-Components contain hclt files, e.g. hcl templates.  [HCL](https://www.terraform.io/docs/configuration/syntax.html) is a json-like declarative language used by terraform.
+Components are hclt files, e.g. hcl templates.  [HCL](https://www.terraform.io/docs/configuration/syntax.html) is a json-like declarative language used by terraform.
 
 ```
-inputs.hclt
-terragrunt.hclt
+cat component.hclt
+
+source  {
+    path = "/path/to/terraform/files"
+}
+inputs {
+    foo = "bar"
+}
 ```
 
-- inputs.hcl contains the inputs which will be injected into the terraform module
-- terragrunt.hclt tells terragrunt which terraform module to use with this component
+- the `inputs`` block contains the inputs which will be injected into the terraform module
+- the `source`` block tells tb which terraform module to use with this component
 - hclt files contain variables, formatted **${like_this}**
 
 ### Component parsing and variables
@@ -93,74 +99,50 @@ When `tb` is run on a component, it:
 1. lints/parses all hclt files, fails if there are syntax errors
 1. loads all yml files in the component and all parent directories as variables. 
 1. replaces all variables in the hclt.  If variables are left unreplaced, the parser stops with an error message.
-1. if all variables are replaced, it saves the result as `terragrunt.hcl` in the component directory.  This file is ready to be used by terragrunt
-
+1. if all variables are replaced, it saves the result as `component.hcl` in the component directory.
 
 **Component parsing in detail**
 
 combines hclt files in the component directory with those in its parent directories.  For example, at the root of the project there is a remote_state.hclt file.  The contents of this file will be included in **all components**.
 
-Another example is to refactor the terragrunt.hclt in a situation where a folder contains lots of components that use the same terraform module.
+Another example is to refactor the source.hclt in a situation where a folder contains lots of components that use the same terraform module.
 
 ```
 az-wf-platform-infra$ ll prep/network_security_groups/*
 prep/network_security_groups/bastion:
-inputs.hclt
-terragrunt.hclt
+component.hclt
 
 prep/network_security_groups/db:
-inputs.hclt
-terragrunt.hclt
+component.hclt
 
 prep/network_security_groups/db-apps:
-inputs.hclt
-terragrunt.hclt
+component.hclt
 
 prep/network_security_groups/public-webserver:
-inputs.hclt
-terragrunt.hclt
+component.hclt
 ```
 
-All of the above terragrunt.hclt files are exactly the same.  
+All of the above component.hclt contain the same `source` block  
 
-```
-az-wf-platform-infra$ ll prep/network_security_groups/*
-prep/network_security_groups/bastion:
-inputs.hclt
-terragrunt.hclt
-
-prep/network_security_groups/db:
-inputs.hclt
-terragrunt.hclt
-
-prep/network_security_groups/db-apps:
-inputs.hclt
-terragrunt.hclt
-
-prep/network_security_groups/public-webserver:
-inputs.hclt
-terragrunt.hclt
-```
-
-We can move them up one level in the filesystem, thusly:
+We can add an hclt file with a `source` block in the top level folder, thusly:
 
 ```
 az-wf-platform-infra$ ll prep/network_security_groups/*
 
 prep/network_security_groups:
-terragrunt.hclt
+source.hclt
 
 prep/network_security_groups/bastion:
-inputs.hclt
+component.hclt
 
 prep/network_security_groups/db:
-inputs.hclt
+component.hclt
 
 prep/network_security_groups/db-apps:
-inputs.hclt
+component.hclt
 
 prep/network_security_groups/public-webserver:
-inputs.hclt
+component.hclt
 ```
 
 **Template Overriding**
@@ -169,9 +151,8 @@ hclt files with the same filename as others above them in the filesystem overrid
 
 ```
 prep/network_security_groups/public-webserver-other-remote-state:
-inputs.hclt
+component.hclt
 remote_state.hclt  # overrides remote_state.hclt in project root
-terragrunt.hclt
 ```
 
 **Component variables in detail**
@@ -308,19 +289,7 @@ tb plan prod/network_security_groups/db
 Each of the above lines is a component.  Running `tb plan <component>` will run the plan command on the component in question.
 
 ```
-$ tb plan prep/application_security_groups/db-apps
-```
-
-```
-[terragrunt] 2020/05/13 12:39:33 Reading Terragrunt config file at prep/application_security_groups/db-apps/terragrunt.hcl
-[terragrunt] [prep/application_security_groups/db-apps] 2020/05/13 12:39:33 Running command: /home/user/.config/terrabuddy/bin/terraform --version
-...
-data.terraform_remote_state.resource_group: Refreshing state...
-azurerm_application_security_group.this: Refreshing state... [id=/subscriptions/27aaa3c6-5a24-4a2a-8117-8d4991ec6f07/resourceGroups/wf-platform-infra-prep/providers/Microsoft.Network/applicationSecurityGroups/wf-platform-infra-prep-db-apps]
-
-------------------------------------------------------------------------
-
-No changes. Infrastructure is up-to-date.
+# TODO REDO
 ```
 
 The above result means that the component already exists in Azure and is up to date with the component.

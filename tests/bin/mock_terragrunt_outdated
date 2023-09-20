@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-echo "terragrunt version v0.23.17"

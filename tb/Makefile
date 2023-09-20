@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-install:
+install: uninstall
 	python3 setup.py install --user
 
 uninstall:
