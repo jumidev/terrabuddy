@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json, os, sys, yaml, hcl, zipfile
+import json, os, sys, yaml, hcl, zipfile, shutil, time
 from fuzzywuzzy import fuzz
-import argparse, glob
+import argparse, glob, tempfile
 from subprocess import Popen, PIPE
 from pyfiglet import Figlet
 import requests
@@ -101,6 +101,13 @@ def flatwalk(path):
     for (folder, b, c) in os.walk(path):
         for fn in c:
             yield (folder, fn)
+
+def delfiles(d, olderthan_days=30):
+    cutoff = (time.time())- olderthan_days * 86400
+    for folder, fn in flatwalk(d):
+        if os.path.getmtime(os.path.join(folder, fn)) < cutoff:
+            shutil.rmtree((os.path.join(folder, fn)))
+            os.remove(os.path.join(folder, fn))
 
 def dir_is_git_repo(dir):
     try:
@@ -310,9 +317,6 @@ class WrapTerraform():
     def set_quiet(self, which=True):
         self.quiet = which
 
-    def setup_wdir_env(self):
-        pass
-
     def get_command(self, command, wdir=".", var_file=None, extra_args=[]):
 
         if var_file != None:
@@ -341,7 +345,8 @@ class Project():
         git_filtered=False,
         conf_marker="project.yml",
         inpattern=".hclt",
-        dir=os.getcwd()):
+        dir=os.getcwd(),
+        tf_wdir=None):
 
         self.inpattern=inpattern
         self.dir=dir
@@ -352,6 +357,7 @@ class Project():
         self.git_filtered = git_filtered
         self.conf_marker = conf_marker
         self.remotestates = None
+        self.tf_wdir = tf_wdir
 
     def set_dir(self, dir):
         self.dir=dir
@@ -467,7 +473,6 @@ class Project():
 
         return None
 
-
     def get_bundle(self, wdir):
         components = []
 
@@ -575,6 +580,14 @@ class Project():
                         self.remotestates = RemoteStates()
                     self.vars[k] = self.remotestates.value(component, key)
 
+    def clean_wdir_cache(self):
+        d = self.root_wdir
+        delfiles(d, 30)
+
+    def setup_wdir(self):
+        print(self.hclfile)
+
+
     def save_outfile(self):
         with open(self.outfile, 'w') as fh:
             fh.write(self.hclfile)
@@ -589,6 +602,19 @@ class Project():
         absroot = self.get_project_root(self.dir)
 
         return abswdir[len(absroot)+1:]
+
+
+
+    @property
+    def root_wdir(self):
+        tf_wdir =  self.tf_wdir
+        if tf_wdir == None:
+            tf_wdir = os.path.expanduser("~/.cache/terrabuddy/wdir/")
+
+        if not os.path.isdir(tf_wdir):
+            os.makedirs(tf_wdir)
+
+        return tf_wdir
 
     def get_template(self):
         self.templates = OrderedDict()
@@ -716,6 +742,63 @@ class Project():
     def hclfile(self):
         self.parse_template()
         return self.out_string
+
+
+class ComponentSourceException(Exception):
+    pass
+
+
+class ComponentSource():
+    def __init__(self, args) -> None:
+        self.args = args
+
+    def set_targetdir(self,targetdir ):
+        if not os.path.isdir(targetdir):
+            os.makedirs(targetdir)
+
+        self.targetdir = targetdir
+
+    def fetch(self):
+        raise ComponentSourceException("not implemented here")
+
+class ComponentSourcePath(ComponentSource):
+    
+    def fetch(self):
+        if "path" not in self.args:
+             raise ComponentSourceException("path not present in source block")
+        
+        if not os.path.isdir(self.args["path"]):
+             raise ComponentSourceException("No such directory: {}".format(self.args["path"]))
+
+        shutil.copytree(self.args["path"], self.targetdir, dirs_exist_ok=True)
+    
+
+class ComponentSourceGit(ComponentSource):
+    def fetch(self):
+        if "repo" not in self.args:
+             raise ComponentSourceException("repo not present in source block")
+        
+        t = tempfile.mkdtemp()
+
+        try:
+            if "branch" in self.args:
+                Repo.clone_from(self.args["repo"], t, branch=self.args["branch"])
+            else:
+                Repo.clone_from(self.args["repo"], t)
+        except:
+            raise ComponentSourceException("Error cloning git repo {}".format(self.args["repo"]))
+        
+        if "path" in self.args:
+
+            subdir = "{}/{}".format(t, self.args["path"])
+            if not os.path.isdir(subdir):
+                raise ComponentSourceException("No such path {} in repo: {}".format(self.args["path"], self.args["repo"]))
+
+            shutil.copytree(subdir, self.targetdir, dirs_exist_ok=True)
+
+        else:
+            shutil.copytree(t, self.targetdir, dirs_exist_ok=True)
+    
 
 class Utils():
 
@@ -1038,6 +1121,10 @@ def main(argv=[]):
     else:
         command = args.command[1]
 
+    if command == "terraform":
+        print(u.terraform_path)
+        return 0
+
     CHECK_GIT = True
     if command[0:5] in ('apply', 'destr'):
         # [0:5] to also include "*-all" command variants
@@ -1048,8 +1135,6 @@ def main(argv=[]):
 
     if args.no_check_git or os.getenv('TB_NO_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1'] :
         CHECK_GIT = False
-
-
 
     # check git
     if CHECK_GIT:
@@ -1100,6 +1185,7 @@ def main(argv=[]):
         t = project.component_type(component=wdir)
         if t == "component":
             project.parse_template()
+            project.setup_wdir()
             project.save_outfile()
 
             if command == "showvars":

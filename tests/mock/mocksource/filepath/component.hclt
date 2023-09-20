@@ -1,0 +1,7 @@
+source {
+	path = "${PROJECT_ROOT}/${COMPONENT_PATH}/tf"
+}
+
+inputs {
+	foo = "bar"
+}

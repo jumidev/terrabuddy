@@ -1,0 +1,8 @@
+source {
+	repo = "https://github.com/jumidev/test_component_placeholder.git"
+	branch = "test_branch"
+}
+
+inputs {
+	foo = "bar"
+}
