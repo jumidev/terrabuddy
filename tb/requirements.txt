@@ -6,3 +6,6 @@ fuzzywuzzy
 python-Levenshtein
 requests
 gitpython
+
+boto3
+PyCryptodome

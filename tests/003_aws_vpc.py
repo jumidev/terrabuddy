@@ -10,7 +10,7 @@ path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
 pylib = os.path.abspath(path)
 sys.path.append(pylib)
 
-class TestTbComponentSource(unittest.TestCase):
+class TestTbAwsVpc(unittest.TestCase):
 
     def setUp(self):
         pass
@@ -18,7 +18,7 @@ class TestTbComponentSource(unittest.TestCase):
     def tearDown(self):
         pass
 
-    def test_vpc_plan(self):
+    def test_vpc_fetch_source(self):
         p = tempfile.mkdtemp()
 
         project = Project(git_filtered=False)

@@ -9,10 +9,18 @@ from pyfiglet import Figlet
 import requests
 import datetime
 from collections import OrderedDict
-import re
+import re, hashlib
+from pathlib import Path
+
+from base64 import b64encode, b64decode
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 
 from git import Repo, Remote, InvalidGitRepositoryError
 import time
+
+import boto3
+from botocore.exceptions import ClientError
 
 PACKAGE = "tb"
 LOG = True
@@ -41,9 +49,9 @@ def debug(s):
     if DEBUG == True:
         print (stylelog(s))
 
-def run(cmd, splitlines=False, env=os.environ, raise_exception_on_fail=False):
+def run(cmd, splitlines=False, env=os.environ, raise_exception_on_fail=False, cwd='.'):
     # you had better escape cmd cause it's goin to the shell as is
-    proc = Popen([cmd], stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True, env=env)
+    proc = Popen([cmd], stdout=PIPE, stderr=PIPE, universal_newlines=True, shell=True, env=env, cwd=cwd)
     out, err = proc.communicate()
     if splitlines:
         out_split = []
@@ -60,7 +68,7 @@ def run(cmd, splitlines=False, env=os.environ, raise_exception_on_fail=False):
 
     return (out, err, exitcode)
 
-def runshow(cmd, env=os.environ):
+def runshow(cmd, env=os.environ, cwd='.'):
     # you had better escape cmd cause it's goin to the shell as is
 
     stdout = sys.stdout
@@ -70,7 +78,7 @@ def runshow(cmd, env=os.environ):
         stdout = None
         strerr = None
 
-    proc = Popen(cmd, stdout=stdout, stderr=stderr, shell=True, env=env)
+    proc = Popen([cmd], stdout=stdout, stderr=stderr, shell=True, env=env, cwd=cwd)
     proc.communicate()
 
     exitcode = int(proc.returncode)
@@ -263,12 +271,12 @@ class NoRemoteState(Exception):
 class RemoteStateKeyNotFound(Exception):
     pass
 
-class RemoteStates():
+class RemoteStateReader():
 
     def __init__(self):
         self.components = {}
 
-    def fetch(self, component):
+    def load(self, component):
         if component not in self.components.values():
             u = Utils()
             wt = WrapTerraform(terraform_path=u.terraform_path)
@@ -284,7 +292,7 @@ class RemoteStates():
                     raise NoRemoteState("ERROR: No remote state found for component {}".format(component))
   
     def value(self, component, key):
-        self.fetch(component)
+        self.load(component)
         
         try:
             value = self.components[component][key]["value"]
@@ -387,11 +395,21 @@ class Project():
         obj = hcl.loads(self.out_string)
 
         debug(obj)
-        try:
-            d = obj["remote_state"]
-        except KeyError:
-            if require_remote_state_block:
-                return "No remote_state block found."
+        required = ["inputs", "source"]
+
+        if require_remote_state_block:
+            required.append("remote_state")
+
+        missing = []
+        for r in required:
+
+            try:
+                d = obj[r]
+            except KeyError:
+                missing.append(r)
+
+        if len(missing) > 0:
+            return "Component missing block(s): {}.".format(", ".join(missing))
 
         return True
 
@@ -463,7 +481,6 @@ class Project():
                         self.components.append((which, dirpath, True))
         
         return self.components
-    
 
 
     def component_type(self, component, dir='.'):
@@ -577,7 +594,7 @@ class Project():
                     txt = self.parsetext(v[7:-1])
                     (component, key) = txt.split(":")
                     if self.remotestates == None:
-                        self.remotestates = RemoteStates()
+                        self.remotestates = RemoteStateReader()
                     self.vars[k] = self.remotestates.value(component, key)
 
     def setup_wdir(self):
@@ -794,6 +811,125 @@ class ComponentSourceGit(ComponentSource):
     
         shutil.rmtree(t)
 
+class ComponentRemoteState():
+    BLOCK_SIZE = 16
+
+    def __init__(self, args, localpath) -> None:
+        self.args = args
+        self.localpath = localpath
+        self.passphrase = None
+        self.fetched = False
+
+        unpad = lambda s: s[:-ord(s[len(s) - 1:])]
+ 
+    def set_passphrase(self, passphrase):
+        self.passphrase = passphrase
+    
+    def encrypt(self):
+        if self.passphrase == None:
+            raise Exception("No passphrase given")
+            
+        with open(self.localpath, 'r') as fh:
+            content = fh.read()
+    
+        private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
+        pad = lambda s: s + (self.BLOCK_SIZE - len(s) % self.BLOCK_SIZE) * chr(self.BLOCK_SIZE - len(s) % self.BLOCK_SIZE)
+        padded = pad(content)
+        iv = get_random_bytes(AES.block_size)
+        cipher = AES.new(private_key, AES.MODE_CBC, iv)
+        
+        
+
+        ciphertext = cipher.encrypt(bytes(padded.encode('utf-8')))
+
+        with open(self.localpath, 'w') as fh:
+            json.dump({'ciphertext':  b64encode(ciphertext).decode('utf-8'), 'iv': b64encode(iv).decode('utf-8')}, fh)
+        
+    def decrypt(self):
+        if self.passphrase == None:
+            raise Exception("No passphrase given")
+        
+        with open(self.localpath, 'rb') as fh:
+            obj = json.load(fh)
+
+        unpad = lambda s: s[:-ord(s[len(s) - 1:])]
+
+        try:
+            iv = b64decode(obj['iv'])
+            ciphertext = b64decode(obj['ciphertext'])
+
+            private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
+
+            cipher = AES.new(private_key, AES.MODE_CBC, iv)
+
+            plaintext = unpad(cipher.decrypt(ciphertext))
+
+            with open(self.localpath, "wb") as fh:
+                fh.write(plaintext)
+
+        except (ValueError, KeyError):
+            print("Incorrect decryption")
+            
+
+    @property
+    def is_encrypted(self):
+
+        try:
+            with open(self.localpath, 'r') as fh:
+                obj = json.load(fh)
+
+            if "ciphertext" in obj:
+                return True
+        except:
+            pass
+
+        return False
+    
+    def push(self):
+        raise Exception("not implemented here")
+
+    def fetch(self):
+        raise Exception("not implemented here")
+    
+class ComponentRemoteStateAwsS3(ComponentRemoteState):
+    s3_client = boto3.client('s3')
+
+    def push(self):
+        bucket = self.args["bucket"]
+        bucket_path = self.args["bucket_path"]
+        try:
+            response = self.s3_client.upload_file(self.localpath, bucket, "{}/terraform.tfvars".format(bucket_path))
+        except ClientError as e:
+            debug(e)
+            return False
+        return True
+
+    def fetch(self):
+        bucket = self.args["bucket"]
+        bucket_path = self.args["bucket_path"]
+    
+        with open(self.localpath, 'wb') as fh:
+            self.s3_client.download_fileobj(bucket, '{}/terraform.tfvars'.format(bucket_path), fh)
+
+        self.fetched = True
+
+class ComponentRemoteStateAzureStorage(ComponentRemoteState):
+    pass
+
+class ComponentRemoteStateFilesystem(ComponentRemoteState):
+    def push(self):
+        tf_path = self.args["path"]
+
+        if not os.path.isdir(os.path.dirname(tf_path)):
+            os.makedirs(os.path.dirname(tf_path))
+        
+        shutil.copy(self.localpath, tf_path)
+
+    def fetch(self):
+        tf_path = self.args["path"]
+
+        if os.path.isfile(tf_path):
+            shutil.copy(tf_path, self.localpath)
 
 class Utils():
 
@@ -1172,19 +1308,25 @@ def main(argv=[]):
 
         if tf_wdir == None:
             current_date_slug = datetime.date.today().strftime('%Y-%m-%d')
-            cdir_slug = cdir.replace('/', '_')
 
-            tf_wdir_root = os.path.expanduser('~/.cache/terrabuddy/wdir')
-            tf_wdir_d = '{}/{}'.format(tf_wdir_root, current_date_slug)
-            tf_wdir = '{}/{}/{}'.format(tf_wdir_d, cdir_slug,  str(time.time()))
+            project_abspath = os.path.abspath(project.get_project_root())
+            project_slug = hashlib.sha224(project_abspath.encode('utf-8')).hexdigest()
+            cdir_relproject = os.path.abspath(os.getcwd())[len(project_abspath)+1:]+'/'+cdir
+            cdir_slug = cdir_relproject.replace('/', '_')
 
+            tf_wdir_root = os.path.expanduser('~/.cache/terrabuddy/')
+            tf_wdir_p = '{}/{}/{}'.format(tf_wdir_root, project_slug, current_date_slug)
 
-            if not os.path.isdir(tf_wdir_d):
+            tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug,  str(time.time()))
+
+            if not os.path.isdir(tf_wdir_p):
                 # first time today tb has been run, clean up past cache
                 delfiles(tf_wdir_root, 30)
 
-            if not os.path.isdir(tf_wdir):
-                os.makedirs(tf_wdir)
+            if os.path.isdir(tf_wdir):
+                shutil.rmtree(tf_wdir)
+
+            os.makedirs(tf_wdir)
 
         debug("setting tf_wdir to {}".format(tf_wdir))
         project.set_tf_dir(tf_wdir)
@@ -1224,13 +1366,13 @@ def main(argv=[]):
                 # we have parsed, our job here is done
                 return 0
 
-            # check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
-            # if check != True:
-            #     print ("An error was found after parsing {}: {}".format(project.outfile, check))
-            #     return 110
+            check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
+            if check != True:
+                print ("An error was found after parsing {}: {}".format(project.outfile, check))
+                return 110
 
             if args.key != None:
-                rs = RemoteStates()
+                rs = RemoteStateReader()
                 print(rs.value(cdir, args.key))
                 return 0
             else:
@@ -1240,15 +1382,56 @@ def main(argv=[]):
 
                 if not args.dry:
 
-                    instanciate ComponentSource
-                    fetch into tf_wdir
-                    extract inputs into tfvars
-                    terraform init
-                    get tfstate
+                    # instanciate ComponentSource
 
-                    terraform plan apply
+                    obj = hcl.loads(project.hclfile)
+                    debug(obj)
+                    if "source" not in obj:
+                        raise Exception("No source block specified in component")
+                    if "repo" in obj["source"]:
+                        cs = ComponentSourceGit(args=obj["source"])
 
-                    save tfstate
+                    elif "path" in obj["source"]:
+                        cs = ComponentSourcePath(args=obj["source"])
+
+                    else:
+                        raise Exception("No ComponentSource handler for component")
+                    
+                    # fetch into tf_wdir
+                    cs.set_targetdir(tf_wdir)
+                    cs.fetch()
+
+
+                    # extract inputs into tfvars
+                    with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
+                        for k,v in obj["inputs"].items():
+                            fh.write("{} = \"{}\"".format(k,v.replace('"', '\\"')))
+                            fh.write("\n")
+
+                    # terraform init
+                    cmd =  "{} init ".format(wt.tf_bin)
+                    
+                    exitcode = runshow(cmd, cwd=tf_wdir)
+                    
+                    # touch tfstate
+                    tfstate_file = "{}/terraform.tfstate".format(tf_wdir)
+                    Path(tfstate_file).touch()
+
+                    cmd =  "{} plan -out tfplan -state=terraform.tfstate".format(wt.tf_bin)
+                    exitcode = runshow(cmd, cwd=tf_wdir)
+
+                    cmd =  "{} apply tfplan".format(wt.tf_bin)
+                    exitcode = runshow(cmd, cwd=tf_wdir)
+
+                    return
+                    
+                    wt.get_command(command="init", wdir=tf_wdir)
+
+                    # get tfstate
+
+                    # terraform plan apply
+
+                    # save tfstate
 
                     cmd =  wt.get_command(command=command, wdir=cdir)
                     debug("cmd = {}".format(cmd))           
