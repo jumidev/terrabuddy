@@ -25,6 +25,10 @@ def get_random_string(length):
 class TestTbAwsPlanVpc(unittest.TestCase):
 
     def setUp(self):
+        # make copy of env vars
+        self.env_orig = os.environ.copy()
+        
+        
         self.boto_client = boto3.client('ec2')
         assert TEST_S3_BUCKET != None
 
@@ -32,6 +36,10 @@ class TestTbAwsPlanVpc(unittest.TestCase):
         assert_creds.assert_aws_creds()
 
     def tearDown(self):
+        # reset environment vars to beginning of run
+        # to avoid spillover into other unit tests
+        os.environ = self.env_orig
+
         response = self.describe_vpcs()
         
         for r in response['Vpcs']:

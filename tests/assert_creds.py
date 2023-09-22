@@ -3,7 +3,7 @@
 
 import os
 
-class MissingAwsCredsException(Exception):
+class MissingCredsException(Exception):
     pass
 
 def assert_aws_creds():
@@ -31,6 +31,9 @@ def assert_aws_creds():
             missing.append(k)
 
     if len(missing) > 0:
-        raise MissingAwsCredsException("Missing AWS credentials in env vars: {}".format(", ".join(missing)))
+        raise MissingCredsException("Missing credentials in env vars: {}".format(", ".join(missing)))
     
     return True
+
+def assert_azurerm_creds():
+    pass
