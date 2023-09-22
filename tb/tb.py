@@ -265,6 +265,9 @@ def git_check(wdir='.'):
         return 0
 
 
+class WrongPasswordException(Exception):
+    pass
+
 class NoRemoteState(Exception):
     pass
 
@@ -825,7 +828,7 @@ class ComponentRemoteState():
     def set_passphrase(self, passphrase):
         self.passphrase = passphrase
     
-    def encrypt(self):
+    def encrypt(self) -> bool:
         if self.passphrase == None:
             raise Exception("No passphrase given")
             
@@ -833,44 +836,53 @@ class ComponentRemoteState():
             content = fh.read()
     
         private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
+        sha256 = hashlib.sha256(content.encode("utf-8")).digest()
         pad = lambda s: s + (self.BLOCK_SIZE - len(s) % self.BLOCK_SIZE) * chr(self.BLOCK_SIZE - len(s) % self.BLOCK_SIZE)
         padded = pad(content)
         iv = get_random_bytes(AES.block_size)
         cipher = AES.new(private_key, AES.MODE_CBC, iv)
-        
-        
 
         ciphertext = cipher.encrypt(bytes(padded.encode('utf-8')))
 
         with open(self.localpath, 'w') as fh:
-            json.dump({'ciphertext':  b64encode(ciphertext).decode('utf-8'), 'iv': b64encode(iv).decode('utf-8')}, fh)
+            json.dump({
+                'ciphertext':  b64encode(ciphertext).decode('utf-8'),
+                'sha256' : b64encode(sha256).decode('utf-8'),
+                'iv': b64encode(iv).decode('utf-8')}, fh)
         
-    def decrypt(self):
+        return True
+
+    def decrypt(self) -> bool:
         if self.passphrase == None:
             raise Exception("No passphrase given")
         
-        with open(self.localpath, 'rb') as fh:
+        with open(self.localpath, 'r') as fh:
             obj = json.load(fh)
 
         unpad = lambda s: s[:-ord(s[len(s) - 1:])]
 
-        try:
-            iv = b64decode(obj['iv'])
-            ciphertext = b64decode(obj['ciphertext'])
 
-            private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
+        iv = b64decode(obj['iv'])
+        ciphertext = b64decode(obj['ciphertext'])
+        sha256 = b64decode(obj['sha256'])
 
-            cipher = AES.new(private_key, AES.MODE_CBC, iv)
+        private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
 
-            plaintext = unpad(cipher.decrypt(ciphertext))
+        cipher = AES.new(private_key, AES.MODE_CBC, iv)
 
-            with open(self.localpath, "wb") as fh:
-                fh.write(plaintext)
+        plaintext = unpad(cipher.decrypt(ciphertext))
 
-        except (ValueError, KeyError):
-            print("Incorrect decryption")
+        this_sha256 = hashlib.sha256(plaintext).digest()
+
+        if this_sha256 != sha256:
+            raise WrongPasswordException("got sha256 {}, expected {}, plaintext: {}".format( this_sha256, sha256, plaintext))
+        with open(self.localpath, "w") as fh:
+            fh.write(plaintext.decode("utf-8"))
+        return True
+
             
 
+        
     @property
     def is_encrypted(self):
 
