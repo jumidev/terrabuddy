@@ -3,11 +3,13 @@
 
 import os, sys, shutil
 import unittest
-from tb import Project, ComponentRemoteStateAwsS3, WrongPasswordException
+from tb import Project, TfStateStoreAwsS3, WrongPasswordException
 import hcl, tempfile, datetime
 from pathlib import Path
 import random
 import string
+import assert_creds
+
 
 path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
 pylib = os.path.abspath(path)
@@ -22,18 +24,17 @@ def get_random_string(length):
     return str(result_str)
 
 
-class TestTbAwsS3RemoteState(unittest.TestCase):
+class TestTbAwsS3StateStore(unittest.TestCase):
 
     def setUp(self):
+        assert_creds.assert_aws_creds()
         assert TEST_S3_BUCKET != None
         self.current_date_slug = datetime.date.today().strftime('%Y-%m-%d')
-
-
         
     def tearDown(self):
         pass        
 
-    def test_aws_s3_remote_state(self):
+    def test_aws_s3_tfstate_store(self):
         d = tempfile.mkdtemp()
         tfstate_file = "{}/terraform.tfstate".format(d)
 
@@ -48,12 +49,12 @@ class TestTbAwsS3RemoteState(unittest.TestCase):
         project.parse_template()
         obj = hcl.loads(project.hclfile)
 
-        obj["remote_state"] = {
+        obj["tfstate_store"] = {
             "bucket" : TEST_S3_BUCKET,
             "bucket_path" : "{}/{}".format(self.current_date_slug, cdir)
         }
 
-        crs = ComponentRemoteStateAwsS3(args=obj["remote_state"], localpath=tfstate_file)
+        crs = TfStateStoreAwsS3(args=obj["tfstate_store"], localpath=tfstate_file)
 
         crs.push()
         os.unlink(tfstate_file)
@@ -64,7 +65,7 @@ class TestTbAwsS3RemoteState(unittest.TestCase):
 
         assert content == random_string
 
-    def test_encrypted_remote_state(self):
+    def test_encrypted_tfstate_store(self):
 
         d = tempfile.mkdtemp()
         tfstate_file = "{}/terraform.tfstate".format(d)
@@ -77,7 +78,7 @@ class TestTbAwsS3RemoteState(unittest.TestCase):
         cdir = "aws/vpc"
         project.set_component_dir(cdir)
 
-        crs = ComponentRemoteStateAwsS3(args={}, localpath=tfstate_file)
+        crs = TfStateStoreAwsS3(args={}, localpath=tfstate_file)
     
         random_passphrase = get_random_string(64)
 
@@ -108,7 +109,7 @@ class TestTbAwsS3RemoteState(unittest.TestCase):
         except WrongPasswordException:
             pass
 
-        # shoud still be encrypted post failure
+        # should still be encrypted post failure
         assert crs.is_encrypted
         
         with open(tfstate_file, 'r') as fh:

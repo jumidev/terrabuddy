@@ -21,6 +21,7 @@ import time
 
 import boto3
 from botocore.exceptions import ClientError
+import botocore
 
 PACKAGE = "tb"
 LOG = True
@@ -268,10 +269,15 @@ def git_check(wdir='.'):
 class WrongPasswordException(Exception):
     pass
 
+class MissingEncryptionPassphrase(Exception):
+    pass
 class NoRemoteState(Exception):
     pass
 
 class RemoteStateKeyNotFound(Exception):
+    pass
+
+class TerraformException(Exception):
     pass
 
 class RemoteStateReader():
@@ -328,14 +334,9 @@ class WrapTerraform():
     def set_quiet(self, which=True):
         self.quiet = which
 
-    def get_command(self, command, wdir=".", var_file=None, extra_args=[]):
+    def get_command(self, command, extra_args=[]):
 
-        if var_file != None:
-            var_file = "-var-file={}".format(var_file)
-        else:
-            var_file = ""
-
-        cmd = "{} {} {} {} ".format(self.tf_bin, command, wdir, var_file, " ".join(set(self.cli_options)), " ".join(extra_args))
+        cmd = "{} {} {} {}".format(self.tf_bin, command, " ".join(set(self.cli_options)), " ".join(extra_args))
         
         if self.quiet:
             cmd += " > /dev/null 2>&1 "
@@ -393,15 +394,15 @@ class Project():
 
         return only_whitespace
 
-    def check_parsed_file(self, require_remote_state_block=False):
+    def check_parsed_file(self, require_tfstate_store_block=False):
         # this function makes sure that self.outstring contains a legit hcl file with a remote state config
         obj = hcl.loads(self.out_string)
 
         debug(obj)
         required = ["inputs", "source"]
 
-        if require_remote_state_block:
-            required.append("remote_state")
+        if require_tfstate_store_block:
+            required.append("tfstate_store")
 
         missing = []
         for r in required:
@@ -814,7 +815,7 @@ class ComponentSourceGit(ComponentSource):
     
         shutil.rmtree(t)
 
-class ComponentRemoteState():
+class TfStateStore():
     BLOCK_SIZE = 16
 
     def __init__(self, args, localpath) -> None:
@@ -875,12 +876,17 @@ class ComponentRemoteState():
         this_sha256 = hashlib.sha256(plaintext).digest()
 
         if this_sha256 != sha256:
-            raise WrongPasswordException("got sha256 {}, expected {}, plaintext: {}".format( this_sha256, sha256, plaintext))
+            raise WrongPasswordException("Wrong decryption passphrase")
         with open(self.localpath, "w") as fh:
             fh.write(plaintext.decode("utf-8"))
+
         return True
 
             
+            
+
+        
+        
 
         
     @property
@@ -903,7 +909,7 @@ class ComponentRemoteState():
     def fetch(self):
         raise Exception("not implemented here")
     
-class ComponentRemoteStateAwsS3(ComponentRemoteState):
+class TfStateStoreAwsS3(TfStateStore):
     s3_client = boto3.client('s3')
 
     def push(self):
@@ -920,15 +926,26 @@ class ComponentRemoteStateAwsS3(ComponentRemoteState):
         bucket = self.args["bucket"]
         bucket_path = self.args["bucket_path"]
     
-        with open(self.localpath, 'wb') as fh:
-            self.s3_client.download_fileobj(bucket, '{}/terraform.tfvars'.format(bucket_path), fh)
-
+        try:
+            with open(self.localpath, 'wb') as fh:
+                self.s3_client.download_fileobj(bucket, '{}/terraform.tfvars'.format(bucket_path), fh)
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == "404":
+                # tfstate is not found, touch a fresh one locally
+                Path(self.localpath).touch()
+                self.fetched = True
+            elif e.response['Error']['Code'] == 403:
+                raise
+            else:
+                # Something else has gone wrong.
+                raise 
+    
         self.fetched = True
 
-class ComponentRemoteStateAzureStorage(ComponentRemoteState):
+class TfStateStoreAzureStorage(TfStateStore):
     pass
 
-class ComponentRemoteStateFilesystem(ComponentRemoteState):
+class TfStateStoreFilesystem(TfStateStore):
     def push(self):
         tf_path = self.args["path"]
 
@@ -1178,6 +1195,7 @@ def main(argv=[]):
     export TB_NO_GIT_CHECK=y            # activates --no-git-check
     export TB_MODULES_PATH              # required if using --dev
     export TB_GIT_FILTER                # when displaying components, only show those which have uncomitted git files
+    export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE #if set, passphrase to encrypt and decrypt remote state files at rest
     """
     #TGARGS=("--force", "-f", "-y", "--yes", "--clean", "--dev", "--no-check-git")
 
@@ -1200,7 +1218,7 @@ def main(argv=[]):
     parser.add_argument('--clean', dest='clean', action='store_true', help='clear all cache')
     parser.add_argument('--force', '--yes', '-t', '-f', action='store_true', help='Perform action without asking for confirmation (same as -auto-approve)')
     parser.add_argument('--dry', action='store_true', help="dry run, don't actually do anything")
-    parser.add_argument('--allow-no-remote-state', action='store_true', help="allow components to be run without a remote state block")
+    parser.add_argument('--allow-no-tfstate-store', action='store_true', help="allow components to be run without a tfstate_store block")
     parser.add_argument('--no-check-git', action='store_true', help='Explicitly skip git repository checks')
     parser.add_argument('--check-git', action='store_true', help='Explicitly enable git repository checks')
     parser.add_argument('--git-filter', action='store_true', help='when displaying components, only show those which have uncomitted files in them.')
@@ -1242,7 +1260,7 @@ def main(argv=[]):
         return 0
 
     # grab args
-
+    tfstate_store_encryption_passphrase = os.getenv("TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE", None)
     git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
     force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
@@ -1378,7 +1396,7 @@ def main(argv=[]):
                 # we have parsed, our job here is done
                 return 0
 
-            check = project.check_parsed_file(require_remote_state_block=not args.allow_no_remote_state)
+            check = project.check_parsed_file(require_tfstate_store_block=not args.allow_no_tfstate_store)
             if check != True:
                 print ("An error was found after parsing {}: {}".format(project.outfile, check))
                 return 110
@@ -1413,6 +1431,30 @@ def main(argv=[]):
                     cs.set_targetdir(tf_wdir)
                     cs.fetch()
 
+                    tfstate_file = "{}/terraform.tfstate".format(tf_wdir)
+
+                    if "tfstate_store" in obj:
+                        # instanciate TfStateStore
+                        if "bucket" in obj["tfstate_store"]:
+                            crs = TfStateStoreAwsS3(args=obj["tfstate_store"], localpath=tfstate_file)
+                        elif "storage_account" in obj["tfstate_store"]:
+                            crs = TfStateStoreAzureStorage(args=obj["tfstate_store"], localpath=tfstate_file)
+                        elif "path" in obj["tfstate_store"]:
+                            crs = TfStateStoreFilesystem(args=obj["tfstate_store"], localpath=tfstate_file)
+                        else:
+                            raise Exception("No TfStateStore handler for component")
+
+                        crs.fetch()
+
+                        if crs.is_encrypted:
+                            if tfstate_store_encryption_passphrase == None:
+                                raise MissingEncryptionPassphrase("Remote state for component is encrypted, you must provide a decryption passphrase")
+                            crs.set_passphrase(tfstate_store_encryption_passphrase)
+                            crs.decrypt()
+
+                    else:
+                        # touch tfstate
+                        Path(tfstate_file).touch()
 
                     # extract inputs into tfvars
                     with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
@@ -1424,30 +1466,36 @@ def main(argv=[]):
                     cmd =  "{} init ".format(wt.tf_bin)
                     
                     exitcode = runshow(cmd, cwd=tf_wdir)
-                    
-                    # touch tfstate
-                    tfstate_file = "{}/terraform.tfstate".format(tf_wdir)
-                    Path(tfstate_file).touch()
+                    if exitcode != 0:
+                        raise TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
+                                        
+                    # requested command
+                    extra_args = ['-state=terraform.tfstate']
 
-                    cmd =  "{} plan -out tfplan -state=terraform.tfstate".format(wt.tf_bin)
+                    cmd = wt.get_command(command, extra_args)
+
                     exitcode = runshow(cmd, cwd=tf_wdir)
+                    if exitcode != 0:
+                        raise TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
 
-                    cmd =  "{} apply tfplan".format(wt.tf_bin)
-                    exitcode = runshow(cmd, cwd=tf_wdir)
+                    # our work is done here
+                    if command in ["refresh", "plan"]:
+                        return 0
 
-                    return
+                    # # terraform apply
+                    # cmd =  "{} apply -state=terraform.tfstate tfplan".format(wt.tf_bin)
+                    # exitcode = runshow(cmd, cwd=tf_wdir)
+                    # if exitcode != 0:
+                    #     raise TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
                     
-                    wt.get_command(command="init", wdir=tf_wdir)
-
-                    # get tfstate
-
-                    # terraform plan apply
+                    if tfstate_store_encryption_passphrase != None:
+                        crs.set_passphrase(tfstate_store_encryption_passphrase)
+                        crs.encrypt()
 
                     # save tfstate
+                    crs.push()
+                    return 0
 
-                    cmd =  wt.get_command(command=command, wdir=cdir)
-                    debug("cmd = {}".format(cmd))           
-                    runshow(cmd)
         elif t == "bundle":
             log("Performing {} on bundle {}".format(command, cdir))
             log("")
