@@ -20,15 +20,23 @@ docker run -it test-terrabuddy
 test componentsource tags
 test vars.yml variables
 test creating multiple vpc subnets using map and rskey
-test rskeys
+test project tfstate setup
+    setup s3
+    setup azure
+    setup encryption
+setup multiple encryption keys
+
+test tfstate values
+
 test fetching value(s) from tfstates
 
 test azurerm
 
 test aws bundle
-test tb shell
+test tb showvars
 test aws sts auth
 test azure auth
 
 test various env vars options
 test git workflow
+test 

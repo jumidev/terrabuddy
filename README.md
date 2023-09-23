@@ -1,15 +1,6 @@
 # terrabuddy
 
-Terrabuddy is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html).  Terrabuddy allows terraform to be used in a way that is [more DRY, more auditable, and more modular.]
-
-### WHAT!?  Why?
-
-**Doesn't adding more layers on top of terraform just make it more complicated than it already is? 😩** 
-
-The above remark is correct.  Terraform by its self can present a steep learning curve, tempting devops to write quick and dirty solutions, because they have better things to do.    However, terraform done quick and dirty turns into technical debt.
-
-While adding a layer on top of terraform brings a *perceived* increase in complexity, its goal is to ultimately bring *long term benefits.* 
-
+Terrabuddy is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html).  Terrabuddy allows terraform to be used in a way that is more **DRY**, more **auditable**, and more **modular.**
 
 ### Terrabuddy Features
 - easily install and update terraform binaries
@@ -37,13 +28,12 @@ tb --setup-terraformrc   # (optional) installs useful terraform default settings
 tb --setup-shell         # (optional) installs useful tb shell aliases
 ```
 
-### Installing terraform modules
+### Installing & using terraform modules
 
-terrabuddy requires terraform modules.  A repo with modules for Azure is provided here:
+terrabuddy can work with any terraform code.  
 
-`git clone https://github.com/jumidev/terraform-modules-azure.git`
-
-Keep a note of the path into which the above is cloned, this will be used by terrabuddy via the TF_MODULES_ROOT env var
+- A repo with modules for Azure is provided (here)[https://github.com/jumidev/terraform-modules-azure.git]
+- For AWS, (here)[https://github.com/jumidev/terraform-modules-aws.git]. (WIP)
 
 
 # Background
@@ -64,13 +54,13 @@ sbx/
 .gitignore
 project.yml
 README.md
-remote_state.hclt
+tfstate_store.hclt
 ```
 
 - The top level directories in the project correspond to the environments, `sbx` (sandbox), `prep` (pre-prod), and  `prod`.  
 - .envrc.tpl contains a template for required environment variables, notably TF_MODULES_ROOT which points to the repo in to which terraform-modules-azure has been cloned
 - project.yml contains project-specific variables.  Other .yml files within the project contain 
-- remote_state.hclt is an hcl template that will be applied in all components
+- tfstate_store.hclt is an hcl template that will be applied in all components
 
 ## Anatomy of a component:
 
@@ -80,35 +70,40 @@ Components are hclt files, e.g. hcl templates.  [HCL](https://www.terraform.io/d
 cat component.hclt
 
 source  {
+    # local path
     path = "/path/to/terraform/files"
+
+    ....
+    # OR a git repo
+    repo = "https://github.com/jumidev/terraform-modules-aws.git"
 }
 inputs {
     foo = "bar"
 }
 ```
 
-- the `inputs`` block contains the inputs which will be injected into the terraform module
-- the `source`` block tells tb which terraform module to use with this component
-- hclt files contain variables, formatted **${like_this}**
+- the `inputs` block contains the inputs which will be injected into the terraform module
+- the `source` block tells tb which terraform module to use with this component, can be a local path or a git repo.
+- hclt files contain variables, formatted `**${like_this}**`
 
 ### Component parsing and variables
 
 When `tb` is run on a component, it:
 
-1. searches in the component directory and all parent directories for hclt files and combines them into a single hclt file. 
 1. lints/parses all hclt files, fails if there are syntax errors
 1. loads all yml files in the component and all parent directories as variables. 
+1. searches in the component directory and all parent directories for hclt files and combines them into a single hclt file. 
 1. replaces all variables in the hclt.  If variables are left unreplaced, the parser stops with an error message.
-1. if all variables are replaced, it saves the result as `component.hcl` in the component directory.
+1. if all variables are replaced, it performs the requested terraform action (`plan`, `apply`, `destroy`, etc)
 
 **Component parsing in detail**
 
-combines hclt files in the component directory with those in its parent directories.  For example, at the root of the project there is a remote_state.hclt file.  The contents of this file will be included in **all components**.
+combines hclt files in the component directory with those in its parent directories.  For example, at the root of the project there is a tfstate_store.hclt file.  The contents of this file will be included in **all components**.
 
 Another example is to refactor the source.hclt in a situation where a folder contains lots of components that use the same terraform module.
 
 ```
-az-wf-platform-infra$ ll prep/network_security_groups/*
+az-platform-infra$ ll prep/network_security_groups/*
 prep/network_security_groups/bastion:
 component.hclt
 
@@ -127,7 +122,7 @@ All of the above component.hclt contain the same `source` block
 We can add an hclt file with a `source` block in the top level folder, thusly:
 
 ```
-az-wf-platform-infra$ ll prep/network_security_groups/*
+az-platform-infra$ ll prep/network_security_groups/*
 
 prep/network_security_groups:
 source.hclt
@@ -147,17 +142,17 @@ component.hclt
 
 **Template Overriding**
 
-hclt files with the same filename as others above them in the filesystem override them.  For example, if you have a component that requires a specific remote_state configuration, you can override the one in the root folder, thusly:
+hclt files in upper directoryies can be overriddden by placing files with the same name deeper in the filesystem.  For example, if you have a component that requires a specific tfstate_store configuration, you can override the one in the root folder, thusly:
 
 ```
 prep/network_security_groups/public-webserver-other-remote-state:
 component.hclt
-remote_state.hclt  # overrides remote_state.hclt in project root
+tfstate_store.hclt  # overrides tfstate_store.hclt in project root
 ```
 
 **Component variables in detail**
 
-tb loads variables in a cascade process, starting at the project root and moving down the filesystem to the component.  For example if we examine the component `prep/bastion/managed_disk`, the following yml files are loaded:
+tb loads variables in a cascade process, starting at the project root and moving down the filesystem to the component.  For example for `prep/bastion/managed_disk`, the following yml files are loaded:
 
 1. **project.yml** in the project root, contains various key/value pairs
 1. **prep/env.yml** \
@@ -174,14 +169,14 @@ $ tb showvars prep/bastion/managed_disk
 
 COMPONENT_DIRNAME=managed_disk
 COMPONENT_PATH=prep/bastion/managed_disk
-PROJECT_ROOT=/home/user/myprojects/az-wf-platform-infra
+PROJECT_ROOT=/home/user/myprojects/az-platform-infra
 TB_INSTALL_PATH=/home/user/wf/terrabuddy/tb
 appname=bastion
 env=prep
 location=westeurope
 organization=wforg
 private_subnet_cidr=172.16.4.0/22
-project_name=wf-platform-infra
+project_name=platform-infra
 public_subnet_cidr=172.16.2.0/24
 vnet_cidr=172.16.0.0/19
 
@@ -189,10 +184,10 @@ vnet_cidr=172.16.0.0/19
 
 **Special Variables**
 
-In addition to variables loaded in .yml files, tb also provides special component variables
+In addition to variables loaded in .yml files, tb also provides special variables
 
-- `COMPONENT_DIRNAME` the directory that contains the component
-- `COMPONENT_PATH` path to component, relative to project
+- `COMPONENT_PATH` full path to component, relative to project
+- `COMPONENT_DIRNAME` innermost component directory
 - `PROJECT_ROOT` absolute path to project
 
 
@@ -246,7 +241,7 @@ Components in a project can be listed with the `tb plan|apply|show` command.
 
 ```
 $ pwd
-~/az-wf-platform-infra
+~/az-platform-infra
 ```
 
 ```
