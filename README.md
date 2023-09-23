@@ -32,8 +32,8 @@ tb --setup-shell         # (optional) installs useful tb shell aliases
 
 terrabuddy can work with any terraform code.  
 
-- A repo with modules for Azure is provided (here)[https://github.com/jumidev/terraform-modules-azure.git]
-- For AWS, (here)[https://github.com/jumidev/terraform-modules-aws.git]. (WIP)
+- A repo with modules for Azure is provided [here](https://github.com/jumidev/terraform-modules-azure.git)
+- For AWS, [here](https://github.com/jumidev/terraform-modules-aws.git). (WIP)
 
 
 # Background
