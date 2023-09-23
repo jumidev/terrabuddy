@@ -1,16 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json, os, sys
 import unittest
-import logging
 import yaml
-
-path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
-pylib = os.path.abspath(path)
-sys.path.append(pylib)
-
-import tb
+import tb, tbcore
 
 class TestTbSanity(unittest.TestCase):
 
@@ -24,7 +17,7 @@ class TestTbSanity(unittest.TestCase):
         try:
             retcode = tb.main(["tb", "parse", "mock/badhclt"])
             assert False
-        except tb.HclParseException:
+        except tbcore.HclParseException:
             pass
 
     def test_good_hclt(self):
@@ -46,9 +39,9 @@ class TestTbSanity(unittest.TestCase):
         retcode = tb.main(["tb", "plan"])
         assert retcode == 100
 
-    # def test_missing_remote_state_block(self):
-    #     retcode = tb.main(["tb", "plan", "mock/goodhclt", "--key", "COMPONENT_DIRNAME"])
-    #     assert retcode == 110
+    def test_missing_remote_state_block(self):
+        retcode = tb.main(["tb", "plan", "mock/goodhclt", "--key", "COMPONENT_DIRNAME"])
+        assert retcode == 110
 
     def test_parse_missingvars(self):
         retcode = tb.main(["tb", "parse", "mock/withvars/missingvars"])

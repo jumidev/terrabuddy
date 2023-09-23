@@ -3,12 +3,9 @@
 
 import os, sys
 import unittest
-from tb import Project, ComponentSourceGit, ComponentSourcePath, ComponentSourceException
+from tbcore import Project, ComponentSourceGit, ComponentSourcePath, ComponentSourceException
 import hcl, tempfile
 
-path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
-pylib = os.path.abspath(path)
-sys.path.append(pylib)
 
 class TestTbComponentSource(unittest.TestCase):
 

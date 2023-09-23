@@ -4,7 +4,7 @@
 import os, sys, hcl, tempfile, json
 import unittest
 import tb
-from tb import Project, TfStateStoreAwsS3
+from tbcore import Project, TfStateStoreAwsS3
 import assert_creds
 import random
 import string

@@ -1,15 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json, os, sys, stat
+import os
 import unittest
-import logging
-import tempfile
-
-path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
-pylib = os.path.abspath(path)
-sys.path.append(pylib)
-
 import tb
 
 class TestTbSetup(unittest.TestCase):

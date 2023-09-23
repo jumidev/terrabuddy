@@ -3,12 +3,8 @@
 
 import os, sys
 import unittest
-from tb import Project, ComponentSourceGit, ComponentSourcePath, ComponentSourceException
+from tbcore import Project, ComponentSourceGit
 import hcl, tempfile
-
-path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
-pylib = os.path.abspath(path)
-sys.path.append(pylib)
 
 class TestTbAwsVpc(unittest.TestCase):
 

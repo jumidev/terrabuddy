@@ -3,7 +3,7 @@
 
 import os, sys, shutil
 import unittest
-from tb import Project, TfStateStoreAwsS3, WrongPasswordException
+from tbcore import Project, TfStateStoreAwsS3, WrongPasswordException
 import hcl, tempfile, datetime
 from pathlib import Path
 import random
