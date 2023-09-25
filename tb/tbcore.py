@@ -339,7 +339,8 @@ class Project():
     def __init__(self,
         git_filtered=False,
         conf_marker="project.yml",
-        inpattern=".hclt"):
+        inpattern=".hclt",
+        override_vars={}):
 
         self.inpattern=inpattern
         self.component_dir=None
@@ -351,6 +352,7 @@ class Project():
         self.conf_marker = conf_marker
         self.remotestates = None
         self.passphrase = None
+        self.override_vars = override_vars
 
     def set_passphrase(self, passphrase):
         self.passphrase = passphrase
@@ -538,7 +540,6 @@ class Project():
             except OSError:
                 self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(__file__))
 
-
             # parse item values
             for i in range(10):
                 for k,v in self.vars.items():
@@ -572,6 +573,8 @@ class Project():
             #         if self.remotestates == None:
             #             self.remotestates = RemoteStateReader()
             #         self.vars[k] = self.remotestates.value(component, key)
+
+
 
     def set_component_instance(self):
         if self.component == None:
@@ -621,7 +624,7 @@ class Project():
             for k,v in obj["tfstate_links"].items():
                 project = deepcopy(self)
                 project.git_filtered = False
-
+                project.components = None # reset component cache
 
                 which = None
                 if "_" in k:
@@ -634,11 +637,11 @@ class Project():
                 t = project.component_type(component=v)
 
                 if t != "component":
-                    raise Exception("tfstate_links key {}, value {} must point to a component".format(k, v))
+                    raise ComponentException("tfstate_links key {}, value {} must point to a component".format(k, v))
 
                 d = tempfile.mkdtemp()
                 tfstate_file = "{}/terraform.tfstate".format(d)
-                project.set_tf_dir(tfstate_file)
+                project.set_tf_dir(d)
                 project.parse_template()
                 project.setup_component_tfstore()
 
@@ -649,8 +652,8 @@ class Project():
 
                     val = tfstate["outputs"][which]["value"]
                     inputs[k] = val
-                except:
-                    raise
+                except KeyError:
+                    raise ComponentException("tfstate_links {} No such output in component {}".format(which, v))
 
         return inputs
 
@@ -716,8 +719,12 @@ class Project():
 
     def parsetext(self, s):
 
+        # self.override_vars
+        for (k, v) in self.override_vars.items():
+            s = s.replace('${' + k + '}', v)
+
         # self.vars
-        for (k, v) in  self.vars.items():
+        for (k, v) in self.vars.items():
             s = s.replace('${' + k + '}', v)
 
         # ENV VARS

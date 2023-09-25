@@ -21,7 +21,7 @@ def get_random_string(length):
     result_str = ''.join(random.choice(letters) for i in range(length))
     return str(result_str)
 
-class TestTbAwsPlanVpc(unittest.TestCase):
+class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
 
     def setUp(self):
         # make copy of env vars
@@ -58,10 +58,8 @@ class TestTbAwsPlanVpc(unittest.TestCase):
 
         random_passphrase = get_random_string(32)
 
-
-        os.environ["run_id"] = self.run_string
         os.environ["TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"] = random_passphrase
-        retcode = tb.main(["tb", "apply", cdir, '--force'])
+        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # assert vpc exists

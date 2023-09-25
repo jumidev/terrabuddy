@@ -47,6 +47,7 @@ def main(argv=[]):
 
     parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terraform')
     parser.add_argument('--key', default=None, help='optional remote state key to return')
+    parser.add_argument('--set-var', action='append', nargs='+', help='optional variable to override (usage: --set-var KEY=VALUE)')
 
     # booleans
     parser.add_argument('--clean', dest='clean', action='store_true', help='clear all cache')
@@ -68,6 +69,7 @@ def main(argv=[]):
     clear_cache = False
 
     args = parser.parse_args(args=argv)
+
     # TODO add project specific args to project.yml
 
     global LOG
@@ -98,7 +100,14 @@ def main(argv=[]):
     git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
     force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
-    project = Project(git_filtered=git_filtered)
+    override_vars = {}
+
+    if args.set_var != None:
+        for set_var in args.set_var:
+            k,v = set_var[0].split("=", 1)
+            override_vars[k] = v
+
+    project = Project(git_filtered=git_filtered, override_vars=override_vars)
     wt = WrapTerraform(terraform_path=u.terraform_path)
 
     if args.downstream_args != None:
