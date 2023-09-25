@@ -57,7 +57,23 @@ class TestTbComponentSource(unittest.TestCase):
         assert os.path.isfile("{}/a.tf".format(p))
         assert os.path.isfile("{}/subdir/modules/b.tf".format(p))
 
-    def test_mock_component_source_githttp_fail_branch(self):
+    def test_mock_component_source_githttp_branch(self):
+
+        project = Project(git_filtered=False)
+        project.set_component_dir("mock/mocksource/githttp")
+        project.parse_template()
+        obj = hcl.loads(project.hclfile)
+        p = tempfile.mkdtemp()
+        obj["source"]["branch"] = "test_branch"
+        cs = ComponentSourceGit(args=obj["source"])
+        cs.set_targetdir(p)
+        cs.fetch()
+
+        assert os.path.isfile("{}/a.tf".format(p))
+        assert os.path.isfile("{}/subdir/modules/b.tf".format(p))
+
+
+    def test_mock_component_source_githttp_branch_fail(self):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
@@ -82,6 +98,36 @@ class TestTbComponentSource(unittest.TestCase):
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         obj["source"]["path"] = "fail path"
+        cs = ComponentSourceGit(args=obj["source"])
+        cs.set_targetdir(p)
+
+        try:
+            cs.fetch()
+            assert False
+        except ComponentSourceException:
+            pass
+
+    def test_mock_component_source_githttp_tag(self):
+
+        project = Project(git_filtered=False)
+        project.set_component_dir("mock/mocksource/githttp")
+        project.parse_template()
+        obj = hcl.loads(project.hclfile)
+        p = tempfile.mkdtemp()
+        obj["source"]["tag"] = "test_tag"
+        cs = ComponentSourceGit(args=obj["source"])
+        cs.set_targetdir(p)
+
+        cs.fetch()
+
+    def test_mock_component_source_githttp_tag_fail(self):
+
+        project = Project(git_filtered=False)
+        project.set_component_dir("mock/mocksource/githttp")
+        project.parse_template()
+        obj = hcl.loads(project.hclfile)
+        p = tempfile.mkdtemp()
+        obj["source"]["tag"] = "WRONG_TAG"
         cs = ComponentSourceGit(args=obj["source"])
         cs.set_targetdir(p)
 

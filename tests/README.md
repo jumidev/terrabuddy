@@ -17,7 +17,7 @@ docker run -it test-terrabuddy
 
 # TODO
 
-test componentsource tags
+test componentsource git tag
 test vars.yml variables
 test creating multiple vpc subnets using map and rskey
 test project tfstate setup
@@ -39,4 +39,7 @@ test azure auth
 
 test various env vars options
 test git workflow
-test 
+test apply failure modes:
+    - no resources created, tfstate still uploaded
+    - some, but not add resources created, tfstate still uploaded
+    - second apply attempt with problem fixed, previously created resources not recreated

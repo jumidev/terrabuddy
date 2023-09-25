@@ -9,6 +9,7 @@ import requests
 from collections import OrderedDict
 import re, hashlib
 from pathlib import Path
+from copy import deepcopy
 
 from base64 import b64encode, b64decode
 from Crypto.Cipher import AES
@@ -139,6 +140,21 @@ def git_rootdir(dir="."):
             # not a git repository
             return None
 
+def get_project_root(dir=".", conf_marker="project.yml", fallback_to_git=True):
+    d = os.path.abspath(dir)
+
+    if os.path.isfile("{}/{}".format(d, conf_marker)):
+        return dir
+    if fallback_to_git and dir_is_git_repo(dir):
+        return dir
+    
+    oneup = os.path.abspath(dir+'/../')
+    if oneup != "/":
+        return get_project_root(oneup, conf_marker, fallback_to_git)
+    
+    raise Exception("Could not find a project root directory")
+
+
 def git_check(wdir='.'):
     
     git_root = git_rootdir(wdir)
@@ -264,6 +280,7 @@ def git_check(wdir='.'):
         return 0
 
 
+
 class WrongPasswordException(Exception):
     pass
 
@@ -277,38 +294,6 @@ class RemoteStateKeyNotFound(Exception):
 
 class TerraformException(Exception):
     pass
-
-class RemoteStateReader():
-
-    def __init__(self):
-        self.components = {}
-
-    def load(self, component):
-        if component not in self.components.values():
-            u = Utils()
-            wt = WrapTerraform(terraform_path=u.terraform_path)
-
-            wt.set_option('-json')
-            wt.set_option('-no-color')
-            (out, err, exitcode) = run(wt.get_command(command="show", wdir=component))
-            if exitcode == 0:
-                d = json.loads(out)
-                try:
-                    self.components[component] = d["values"]["outputs"]
-                except KeyError:
-                    raise NoRemoteState("ERROR: No remote state found for component {}".format(component))
-  
-    def value(self, component, key):
-        self.load(component)
-        
-        try:
-            value = self.components[component][key]["value"]
-        except KeyError:
-            msg = "ERROR: State key \"{}\" not found in component {}\nKey must be one of: {}".format(key, component, ", ".join(self.components[component].keys()))
-            raise RemoteStateKeyNotFound(msg)
-
-        return value
-
 
 class WrapTerraform():
 
@@ -365,12 +350,17 @@ class Project():
         self.git_filtered = git_filtered
         self.conf_marker = conf_marker
         self.remotestates = None
+        self.passphrase = None
+
+    def set_passphrase(self, passphrase):
+        self.passphrase = passphrase
 
     def set_tf_dir(self, dir):
         self.tf_dir = dir
 
     def set_component_dir(self, dir):
         self.component_dir=dir
+        self.component = None
         self.vars = None
 
     def check_hclt_file(self, path):
@@ -425,7 +415,6 @@ class Project():
             with open(path, 'w') as fh:
                 fh.write(out)
                 
-
     def example_commands(self, command):
         log("")
 
@@ -438,23 +427,9 @@ class Project():
                 log(s)
         log("")
         
-    def get_project_root(self, dir=".", fallback_to_git=True):
-        d = os.path.abspath(dir)
-
-        if os.path.isfile("{}/{}".format(d, self.conf_marker)):
-            return dir
-        if fallback_to_git and dir_is_git_repo(dir):
-            return dir
-        
-        oneup = os.path.abspath(dir+'/../')
-        if oneup != "/":
-            return self.get_project_root(oneup, fallback_to_git)
-        
-        raise Exception("Could not find a project root directory")
-
    # def get_filtered_components(wdir, filter):
 
-    def get_components(self, dir='.'):
+    def get_components(self):
         if self.components == None:
             self.components = []
             filtered = []
@@ -484,9 +459,8 @@ class Project():
         
         return self.components
 
-
-    def component_type(self, component, dir='.'):
-        for which, c, match in self.get_components(dir=dir):
+    def component_type(self, component):
+        for which, c, match in self.get_components():
             if c == component:
                 return which
 
@@ -520,7 +494,7 @@ class Project():
         if type(order) == list:
             for i in order:
                 component = "{}/{}".format(wdir, i)
-                if self.component_type(component, wdir) == "component":
+                if self.component_type(component) == "component":
                     components.append(component)
                 else:
                     for c in  self.get_bundle(component):
@@ -534,7 +508,7 @@ class Project():
             self.check_hclt_file(f)
 
     def get_files(self):
-        project_root = self.get_project_root(self.component_dir)
+        project_root = get_project_root(self.component_dir, self.conf_marker)
         for (folder, fn) in flatwalk_up(project_root, self.component_dir):
             if fn.endswith(self.inpattern):
                 yield "{}/{}".format(folder, fn)
@@ -542,7 +516,7 @@ class Project():
     def get_yml_vars(self):
         if self.vars == None:
             var_sources = {}
-            project_root = self.get_project_root(self.component_dir)
+            project_root = get_project_root(self.component_dir, self.conf_marker)
             self.vars={}
             for (folder, fn) in flatwalk_up(project_root, self.component_dir):
                 if fn.endswith('.yml'):
@@ -591,16 +565,94 @@ class Project():
                 raise ErrorParsingYmlVars(" ".join(problems))
 
             # now for every value that starts with rspath(...), parse
-            for k,v in self.vars.items():
-                if v.startswith("rspath(") and v.endswith(")"):
-                    txt = self.parsetext(v[7:-1])
-                    (component, key) = txt.split(":")
-                    if self.remotestates == None:
-                        self.remotestates = RemoteStateReader()
-                    self.vars[k] = self.remotestates.value(component, key)
+            # for k,v in self.vars.items():
+            #     if v.startswith("rspath(") and v.endswith(")"):
+            #         txt = self.parsetext(v[7:-1])
+            #         (component, key) = txt.split(":")
+            #         if self.remotestates == None:
+            #             self.remotestates = RemoteStateReader()
+            #         self.vars[k] = self.remotestates.value(component, key)
 
-    def setup_wdir(self):
-        debug(self.hclfile)
+    def set_component_instance(self):
+        if self.component == None:
+            obj = hcl.loads(self.hclfile)
+            tfstate_file = "{}/terraform.tfstate".format(self.tf_dir)
+            self.component = Component(
+                args=obj,
+                dir=self.component_dir,
+                tfstate_file=tfstate_file,
+                tf_dir = self.tf_dir)
+
+    def setup_component_source(self):
+        self.set_component_instance()
+        self.componentsource = self.component.get_source_instance()
+
+    def setup_component_tfstore(self):
+        self.set_component_instance()
+        self.componenttfstore = None
+        obj = hcl.loads(self.hclfile)
+
+        tfstate_file = "{}/terraform.tfstate".format(self.tf_dir)
+
+        if "tfstate_store" in obj:
+
+            crs = self.component.get_tfstate_store_instance()
+
+            if crs.is_encrypted:
+                if self.passphrase == None:
+                    raise MissingEncryptionPassphrase("Remote state for component is encrypted, you must provide a decryption passphrase")
+                crs.set_passphrase(self.passphrase)
+                crs.decrypt()
+
+            self.componenttfstore = crs
+
+        else:
+            # touch tfstate
+            Path(tfstate_file).touch()
+
+    @property
+    def component_inputs(self):
+        obj = hcl.loads(self.hclfile)
+        # lazy-resolve tfstate_links here
+
+        inputs = obj["inputs"]
+
+        if "tfstate_links" in obj:
+            for k,v in obj["tfstate_links"].items():
+                project = deepcopy(self)
+                project.git_filtered = False
+
+
+                which = None
+                if "_" in k:
+                    which = k.split("_")[-1]
+                if ":" in v:
+                    which = v.split(":")[-1]
+                    v = v.split(":")[0]
+
+                project.set_component_dir(v)
+                t = project.component_type(component=v)
+
+                if t != "component":
+                    raise Exception("tfstate_links key {}, value {} must point to a component".format(k, v))
+
+                d = tempfile.mkdtemp()
+                tfstate_file = "{}/terraform.tfstate".format(d)
+                project.set_tf_dir(tfstate_file)
+                project.parse_template()
+                project.setup_component_tfstore()
+
+                with open(tfstate_file, 'r') as fh:
+                    tfstate = json.load(fh)
+
+                try:
+
+                    val = tfstate["outputs"][which]["value"]
+                    inputs[k] = val
+                except:
+                    raise
+
+        return inputs
 
 
     def save_outfile(self):
@@ -608,13 +660,13 @@ class Project():
             fh.write(self.hclfile)
 
     @property
-    def outfile(self):
+    def outfile(self): 
         return "{}/{}".format(self.root_wdir, "component.hcl")
 
     @property
     def component_path(self):
         abswdir = os.path.abspath(self.component_dir)
-        absroot = self.get_project_root(self.component_dir)
+        absroot = get_project_root(self.component_dir, self.conf_marker)
 
         return abswdir[len(absroot)+1:]
 
@@ -753,9 +805,69 @@ class Project():
         self.parse_template()
         return self.out_string
 
+class ComponentException(Exception):
+    pass
+class Component():
+
+    def __init__(self, args, dir, tfstate_file, tf_dir) -> None:
+        self.args = args
+        self.dir = dir
+        self.tfstate_file = tfstate_file
+        self.tf_dir = tf_dir
+
+    def set_dir(self, dir):
+        self.dir = dir
+
+    def set_tfstate_file(self, tfstate_file):
+        self.tfstate_file = tfstate_file
+
+    def get_project_root(self):
+        pass
+
+    def get_source_instance(self):
+        if "source" not in self.args:
+            raise ComponentException("No source block specified in component")
+        source = self.args["source"]
+
+        if "repo" in source:
+            cs = ComponentSourceGit(args=source)
+
+        elif "path" in source:
+            cs = ComponentSourcePath(args=source)
+
+        else:
+            raise ComponentException("No ComponentSource handler for component")
+
+        # fetch into tf_wdir
+        cs.set_targetdir(self.tf_dir)
+        cs.fetch()
+        return cs
+
+    def get_tfstate_store_instance(self):
+        tfstate_file = self.tfstate_file
+        if "tfstate_store" not in self.args:
+            raise ComponentException("tfstate_store block specified in component")
+        tfstate_store = self.args["tfstate_store"]
+
+        # instanciate TfStateStore
+        if "bucket" in tfstate_store:
+            crs = TfStateStoreAwsS3(args=tfstate_store, localpath=tfstate_file)
+        elif "storage_account" in tfstate_store:
+            crs = TfStateStoreAzureStorage(args=tfstate_store, localpath=tfstate_file)
+        elif "path" in tfstate_store:
+            crs = TfStateStoreFilesystem(args=tfstate_store, localpath=tfstate_file)
+        else:
+            raise ComponentException("No TfStateStore handler for component")
+
+        crs.fetch()
+        return crs
+
+
 
 class ComponentSourceException(Exception):
     pass
+
+
 
 
 class ComponentSource():
@@ -791,10 +903,13 @@ class ComponentSourceGit(ComponentSource):
         t = tempfile.mkdtemp()
 
         try:
-            if "branch" in self.args:
+            if "tag" in self.args:
+                Repo.clone_from(self.args["repo"], t, branch=self.args["tag"], depth=1)
+            elif "branch" in self.args:
                 Repo.clone_from(self.args["repo"], t, branch=self.args["branch"], depth=1)
             else:
                 Repo.clone_from(self.args["repo"], t, depth=1)
+            
         except:
             shutil.rmtree(t)
             raise ComponentSourceException("Error cloning git repo {}".format(self.args["repo"]))
@@ -812,6 +927,27 @@ class ComponentSourceGit(ComponentSource):
             shutil.copytree(t, self.targetdir, dirs_exist_ok=True)
     
         shutil.rmtree(t)
+
+class TfStateReader():
+
+    def __init__(self):
+        self.components = {}
+
+    def load(self, component):
+        if component not in self.components.values():
+            # implement here
+            pass
+  
+    def value(self, component, key):
+        self.load(component)
+        
+        try:
+            value = self.components[component][key]["value"]
+        except KeyError:
+            msg = "ERROR: State key \"{}\" not found in component {}\nKey must be one of: {}".format(key, component, ", ".join(self.components[component].keys()))
+            raise RemoteStateKeyNotFound(msg)
+
+        return value
 
 class TfStateStore():
     BLOCK_SIZE = 16

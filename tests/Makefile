@@ -10,5 +10,8 @@ setup:
 test_aws: setup
 	source venv/bin/activate && python3 -m pytest aws_0*py
 
+test_aws_last: setup
+	source venv/bin/activate && python3 -m pytest aws_005*py
+
 test: setup
 	source venv/bin/activate && python3 -m pytest 0*py

@@ -9,9 +9,11 @@ import hashlib
 from pathlib import Path
 import time
 import tbcore
-from tbcore import Utils, Project, run, runshow, WrapTerraform, log, debug, flatwalk, git_check, delfiles, RemoteStateReader
+from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, get_project_root
+from tbcore import Utils, Project, WrapTerraform, TfStateReader
 from tbcore import ComponentSourceGit, ComponentSourcePath
 from tbcore import TfStateStoreAwsS3, TfStateStoreAzureStorage, TfStateStoreFilesystem
+
 
 PACKAGE = "tb"
 LOG = True
@@ -171,7 +173,7 @@ def main(argv=[]):
         if tf_wdir == None:
             current_date_slug = datetime.date.today().strftime('%Y-%m-%d')
 
-            project_abspath = os.path.abspath(project.get_project_root())
+            project_abspath = os.path.abspath(get_project_root(cdir, project.conf_marker))
             project_slug = hashlib.sha224(project_abspath.encode('utf-8')).hexdigest()
             cdir_relproject = os.path.abspath(os.getcwd())[len(project_abspath)+1:]+'/'+cdir
             cdir_slug = cdir_relproject.replace('/', '_')
@@ -206,7 +208,10 @@ def main(argv=[]):
         t = project.component_type(component=cdir)
         if t == "component":
             project.parse_template()
-            project.setup_wdir() # invoke componentsource
+            if tfstate_store_encryption_passphrase != None:
+                project.set_passphrase(tfstate_store_encryption_passphrase)
+
+            project.setup_component_tfstore()
             project.save_outfile()
 
             if command == "showvars":
@@ -234,7 +239,7 @@ def main(argv=[]):
                 return 110
 
             if args.key != None:
-                rs = RemoteStateReader()
+                rs = TfStateReader()
                 print(rs.value(cdir, args.key))
                 return 0
             else:
@@ -244,53 +249,10 @@ def main(argv=[]):
 
                 if not args.dry:
 
-                    # instanciate ComponentSource
+                    project.setup_component_source()
 
-                    obj = hcl.loads(project.hclfile)
-                    debug(obj)
-                    if "source" not in obj:
-                        raise Exception("No source block specified in component")
-                    if "repo" in obj["source"]:
-                        cs = ComponentSourceGit(args=obj["source"])
-
-                    elif "path" in obj["source"]:
-                        cs = ComponentSourcePath(args=obj["source"])
-
-                    else:
-                        raise Exception("No ComponentSource handler for component")
-                    
-                    # fetch into tf_wdir
-                    cs.set_targetdir(tf_wdir)
-                    cs.fetch()
-
-                    tfstate_file = "{}/terraform.tfstate".format(tf_wdir)
-
-                    if "tfstate_store" in obj:
-                        # instanciate TfStateStore
-                        if "bucket" in obj["tfstate_store"]:
-                            crs = TfStateStoreAwsS3(args=obj["tfstate_store"], localpath=tfstate_file)
-                        elif "storage_account" in obj["tfstate_store"]:
-                            crs = TfStateStoreAzureStorage(args=obj["tfstate_store"], localpath=tfstate_file)
-                        elif "path" in obj["tfstate_store"]:
-                            crs = TfStateStoreFilesystem(args=obj["tfstate_store"], localpath=tfstate_file)
-                        else:
-                            raise Exception("No TfStateStore handler for component")
-
-                        crs.fetch()
-
-                        if crs.is_encrypted:
-                            if tfstate_store_encryption_passphrase == None:
-                                raise tbcore.MissingEncryptionPassphrase("Remote state for component is encrypted, you must provide a decryption passphrase")
-                            crs.set_passphrase(tfstate_store_encryption_passphrase)
-                            crs.decrypt()
-
-                    else:
-                        # touch tfstate
-                        Path(tfstate_file).touch()
-
-                    # extract inputs into tfvars
                     with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
-                        for k,v in obj["inputs"].items():
+                        for k,v in project.component_inputs.items():
                             fh.write("{} = \"{}\"".format(k,v.replace('"', '\\"')))
                             fh.write("\n")
 
@@ -320,6 +282,7 @@ def main(argv=[]):
                     # if exitcode != 0:
                     #     raise TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
                     
+                    crs = project.componenttfstore
                     if tfstate_store_encryption_passphrase != None:
                         crs.set_passphrase(tfstate_store_encryption_passphrase)
                         crs.encrypt()
