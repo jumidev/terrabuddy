@@ -13,33 +13,25 @@ docker build . -f Dockerfile-tests -t test-terrabuddy
 docker run -it test-terrabuddy
 ```
 
-
-
 # TODO
-
-test componentsource git tag
-test vars.yml variables
-test creating multiple vpc subnets using map and rskey
-test project tfstate setup
-    setup s3
-    setup azure
-    setup encryption
-setup multiple encryption keys
-
-test tfstate values
-
-test fetching value(s) from tfstates
-
-test azurerm
-
-test aws bundle
-test tb showvars
-test aws sts auth
-test azure auth
-
-test various env vars options
-test git workflow
-test apply failure modes:
-    - no resources created, tfstate still uploaded
-    - some, but not add resources created, tfstate still uploaded
-    - second apply attempt with problem fixed, previously created resources not recreated
+- ~~test componentsource git tag~~
+- ~~test vars.yml variables~~
+- ~~test creating multiple vpc subnets using map and tfstate link~~
+- test project tfstate setup
+   - setup s3
+   - setup azure
+   - setup encryption
+- setup multiple encryption keys
+- test tfstate values
+- test fetching value(s) from tfstates
+- test azurerm
+- test aws bundle
+- test tb showvars
+- test aws sts auth
+- test azure auth
+- test various env vars options
+- test git workflow
+- test apply failure modes:
+  - no resources created, tfstate still uploaded
+  - some, but not add resources created, tfstate still uploaded
+  - second apply attempt with problem fixed, previously created resources not recreated
