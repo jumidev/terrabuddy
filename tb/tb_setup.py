@@ -30,6 +30,7 @@ class NewProject():
         self.saved = False
         self.root_dir = None
         self.git_clone = None
+        self.make_readme = None
         self.envs = []
 
     def checkstr(self, s):
@@ -37,12 +38,19 @@ class NewProject():
         matches = re.search(regex, s)
         return matches != None
 
+    def confirm_leave(self):
+        return yes_no_dialog(
+            title='Confirm',
+            text='You sure you want to quit new project setup?.').run()
+
+
     def tui(self):
         # ask for project dir
         # if dir is already project, fail
         # ask for project name
         # ask to git init
         # ask for envs
+        # ask for readme.md
         # ask to save
         # save
 
@@ -52,12 +60,17 @@ class NewProject():
             title='Project Directory',
             text='Directory to save project to (leave blank for current working dir):').run()
         
+            if d == None:
+                return
+
             if d == "":
                 dir = os.getcwd()
             elif not self.checkstr(d):
                 ok = message_dialog(
                     title='Error',
                     text='Project directory can only contain alphanumeric characters, numbers, underscores and hyphens.').run()
+                if ok == None:
+                    return
                 time.sleep(0.3)
             else:
                 dir = d
@@ -78,10 +91,16 @@ class NewProject():
             default=n,
             text='Project name:').run()
         
+            if n == None:
+                if self.confirm_leave():
+                    return
             if not self.checkstr(n):
                 ok = message_dialog(
                     title='Error',
                     text='Project name can only contain alphanumeric characters, numbers, underscores and hyphens.').run()
+                if ok == None:
+                    if self.confirm_leave():
+                        return
                 time.sleep(0.3)
             else:
                 name = n
@@ -98,7 +117,9 @@ class NewProject():
                 title="Setup git?",
                 text="Usually projects are version controlled using git"
             ).run()
-
+            if result == None:
+                if self.confirm_leave():
+                    return
             if result == "clone":
                 r = ""
                 repo = None
@@ -110,9 +131,14 @@ class NewProject():
                     default=r,
                     text='Repo url:').run()
                 
+                    if r == None:
+                        if self.confirm_leave():
+                            return
                     try:
                         Repo.clone_from(r, t, depth=1)
                         repo = r
+                        if os.path.isfile("{}/README.md".format(t)):
+                            self.make_readme = False
                     except Exception as e:
                         ok = message_dialog(
                             title='Error',
@@ -153,7 +179,15 @@ class NewProject():
 
             self.envs = envs
 
-        
+        if self.make_readme == None:
+            result = yes_no_dialog(
+                title='Setup README.md?',
+                text='Do you want to add a boilerplate README.md file?').run()
+                    
+            self.make_readme = result
+
+
+
         txt = ["Project '{}' will be saved in {}".format(self.name, self.root_dir)]
         if self.git_clone == "init":
             txt.append("✓ will be initialized as a new git repo")
@@ -237,16 +271,32 @@ class NewProject():
         with open(self.gitignore_file, 'w') as fh:
             fh.write("\n".join(gitignore))
 
-        for e in self.envs:
-            e = e.strip()
-            d = "{}/{}".format(self.root_dir, e)
+        md = []
+        md.append("# Project {}".format(self.name))
+        md.append("")
 
-            if not os.path.isdir(d):
-                os.makedirs(d)
+        if len(self.envs) > 0:
+            md.append("Environments:")
+            for e in self.envs:
+                e = e.strip()
+                md.append("- {}".format(e))
+                d = "{}/{}".format(self.root_dir, e)
 
-            with open("{}/env.yml".format(d), "w") as fh:
-                yaml.dump({"env": e}, fh)
-                 
+                if not os.path.isdir(d):
+                    os.makedirs(d)
+
+                with open("{}/env.yml".format(d), "w") as fh:
+                    yaml.dump({"env": e}, fh)
+            md.append("")
+
+
+        if self.make_readme:
+            with open("{}/README.md".format(self.root_dir), "w") as fh:
+                fh.write("\n".join(md))
+
+
+class SetupTfStateStorage(NewProject):
+    pass
 
 def main(argv=[]):
 
@@ -267,11 +317,11 @@ def main(argv=[]):
             "text"  : "Select from the following options",
             "items" : [
                 ("new_project", "New project"),
-                ("goto:creds_setup", "Setup cloud credentials"),
-                ("goto:tfstore_setup", "Setup tfstate storage"),
+                ("creds", "Setup/check cloud credentials"),
+                ("tfstore_setup", "Setup/check tfstate storage"),
                 ("goto:terraform", "Install/upgrade terraform"),
                 ("goto:extras", "Install extras"),
-                ("quit", "Exit"),
+                (None, "Exit"),
 
             ]
         }, "extras": {
@@ -303,16 +353,19 @@ def main(argv=[]):
     #     DEBUG = True
     #     log("debug mode enabled")
 
-    proj = NewProject()
+    result = "start"
+    while result != None:
+        result = radiolist_dialog(
+            values=menu["main"]["items"],
+            title=menu["main"]["title"],
+            text=menu["main"]["text"]
+        ).run()
 
-    if proj.tui():
-    # result = radiolist_dialog(
-    #     values=menu["main"]["items"],
-    #     title=menu["main"]["title"],
-    #     text=menu["main"]["text"]
-    # ).run()
+        if result == 'new_project':
 
-        return 0
+            proj = NewProject()
+            proj.tui()
+
 
 def cli_entrypoint():
     retcode = main(sys.argv[1:])
