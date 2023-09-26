@@ -28,7 +28,6 @@ class NewProject():
     def __init__(self) -> None:
         self.name = None
         self.saved = False
-        self.root_dir = None
         self.git_clone = None
         self.make_readme = None
         self.envs = []
@@ -45,7 +44,6 @@ class NewProject():
 
 
     def tui(self):
-        # ask for project dir
         # if dir is already project, fail
         # ask for project name
         # ask to git init
@@ -54,37 +52,14 @@ class NewProject():
         # ask to save
         # save
 
-        dir = None
-        while dir == None:
-            d = input_dialog(
-            title='Project Directory',
-            text='Directory to save project to (leave blank for current working dir):').run()
-        
-            if d == None:
-                return
-
-            if d == "":
-                dir = os.getcwd()
-            elif not self.checkstr(d):
-                ok = message_dialog(
-                    title='Error',
-                    text='Project directory can only contain alphanumeric characters, numbers, underscores and hyphens.').run()
-                if ok == None:
-                    return
-                time.sleep(0.3)
-            else:
-                dir = d
-                
-        self.root_dir = dir
-
         if self.project_already_setup:
             ok = message_dialog(
             title='Error',
-            text='Project {} is already setup as a project, please provide an empty directory or freshly cloned git repo.'.format(dir)).run()
+            text='Directory is already setup as a project.').run()
             return
 
         name = None
-        n = os.path.basename(self.root_dir)
+        n = os.path.basename(os.path.abspath(os.getcwd()))
         while name == None:
             n = input_dialog(
             title='Project name',
@@ -98,9 +73,6 @@ class NewProject():
                 ok = message_dialog(
                     title='Error',
                     text='Project name can only contain alphanumeric characters, numbers, underscores and hyphens.').run()
-                if ok == None:
-                    if self.confirm_leave():
-                        return
                 time.sleep(0.3)
             else:
                 name = n
@@ -179,14 +151,15 @@ class NewProject():
 
             self.envs = envs
 
+        if os.path.isfile("README.md"):
+            self.make_readme = False
+
         if self.make_readme == None:
             result = yes_no_dialog(
                 title='Setup README.md?',
                 text='Do you want to add a boilerplate README.md file?').run()
                     
             self.make_readme = result
-
-
 
         txt = ["Project '{}' will be saved in {}".format(self.name, self.root_dir)]
         if self.git_clone == "init":
@@ -210,6 +183,10 @@ class NewProject():
 
 
     @property
+    def root_dir(self):
+        return os.getcwd()
+
+    @property
     def yml_file(self):
         return "{}/project.yml".format(self.root_dir)
 
@@ -219,8 +196,6 @@ class NewProject():
         
     @property
     def is_git(self):
-        if not os.path.isdir(self.root_dir):
-            return False
         r = git_rootdir(self.root_dir)
         return r != None
 
@@ -314,13 +289,13 @@ def main(argv=[]):
     menu = {
         "main":  {
             "title" : "{} Main Menu".format(PACKAGE),
-            "text"  : "Select from the following options",
+            "text"  : "Current working directory is {}\nSelect from the following options".format(os.path.abspath(os.getcwd())),
             "items" : [
                 ("new_project", "New project"),
                 ("creds", "Setup/check cloud credentials"),
                 ("tfstore_setup", "Setup/check tfstate storage"),
-                ("goto:terraform", "Install/upgrade terraform"),
-                ("goto:extras", "Install extras"),
+                ("terraform", "Install/upgrade terraform"),
+                ("extras", "Install extras"),
                 (None, "Exit"),
 
             ]
