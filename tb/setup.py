@@ -27,8 +27,9 @@ setup(name='terrabuddy',
     install_requires=install_requires,
     entry_points = {
               'console_scripts': [
-                  'tb=tb:cli_entrypoint'              
-                ],              
+                  'tb=tb:cli_entrypoint',              
+                  'tb_setup=tb_setup:cli_entrypoint'              
+                ]     
           },
 
     )

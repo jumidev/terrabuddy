@@ -5,7 +5,7 @@ import os, sys, hcl, tempfile, json
 import unittest
 import tb
 from tbcore import ComponentException
-import assert_creds
+from tbcore import assert_aws_creds
 import random
 import string
 
@@ -31,7 +31,7 @@ class TestTbAwsVpcSubnet(unittest.TestCase):
 
         self.run_string = get_random_string(10)
 
-        assert_creds.assert_aws_creds()
+        assert_aws_creds()
 
         # make vpc
         cdir = "aws/vpc_tfstate"

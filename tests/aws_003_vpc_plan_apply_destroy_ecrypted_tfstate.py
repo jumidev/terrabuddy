@@ -5,7 +5,7 @@ import os, sys, hcl, tempfile, json
 import unittest
 import tb
 from tbcore import Project, TfStateStoreAwsS3
-import assert_creds
+from tbcore import assert_aws_creds
 import random
 import string
 
@@ -31,7 +31,7 @@ class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
         assert TEST_S3_BUCKET != None
 
         self.run_string = get_random_string(10)
-        assert_creds.assert_aws_creds()
+        assert_aws_creds()
 
     def tearDown(self):
         # reset environment vars to beginning of run
@@ -72,7 +72,7 @@ class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
         assert count == 1
 
         # check that remote state is present on s3
-        project = Project(git_filtered=False)
+        project = Project(git_filtered=False, override_vars={'run_id': self.run_string})
         project.set_component_dir(cdir)
         project.parse_template()
         obj = hcl.loads(project.hclfile)
@@ -84,7 +84,7 @@ class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
         assert crs.is_encrypted
 
         # now destroy
-        retcode = tb.main(["tb", "destroy", cdir, '--force'])
+        retcode = tb.main(["tb", "destroy", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # assert vpc gone

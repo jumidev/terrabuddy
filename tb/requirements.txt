@@ -9,3 +9,4 @@ gitpython
 
 boto3
 PyCryptodome
+prompt_toolkit
