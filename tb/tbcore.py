@@ -1146,6 +1146,8 @@ class Utils():
         except:
             pass
         if terraform_path == None:
+            terraform_path = os.getenv("TERRAFORM_BIN", None)
+        if terraform_path == None:
             terraform_path = "{}/terraform".format(self.bin_dir)
             if not os.path.isdir(self.bin_dir):
                 os.makedirs(self.bin_dir)
@@ -1154,6 +1156,8 @@ class Utils():
 
         if not os.path.isdir(self.conf_dir):
             os.makedirs(self.conf_dir)
+
+
 
     def terraform_currentversion(self):
         if self.terraform_v == None:
@@ -1328,8 +1332,28 @@ class Utils():
 class MissingCredsException(Exception):
     pass
 
-def assert_aws_creds():
-    required = ("AWS_REGION", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME", "AWS_SESSION_TOKEN")
+def aws_sts_cred_keys():
+    return ("AWS_REGION", "AWS_ROLE_ARN", "AWS_ROLE_SESSION_NAME", "AWS_SESSION_TOKEN")
+
+def aws_cred_keys():
+    return ("AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
+
+def azurerm_sp_cred_keys():
+    return ("ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID")
+
+
+def aws_test_creds():
+    sts = boto3.client('sts',
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID", ""),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    )
+    try:
+        sts.get_caller_identity()
+        return True
+    except:
+        return False
+
+def assert_env_vars(required):
     missing = []
     for c in required:
         val = os.environ.get(c, None)
@@ -1338,18 +1362,26 @@ def assert_aws_creds():
 
     if len(missing) == 0:
         return True
-
-    required = ("AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
-    missing = []
-    for c in required:
-        val = os.environ.get(c, None)
-        if val == None:
-            missing.append(c)
-
-    if len(missing) > 0:
-        raise MissingCredsException("Missing credentials in env vars: {}".format(", ".join(missing)))
     
-    return True
+    return missing
 
-def assert_azurerm_creds():
-    pass
+def assert_aws_creds():
+
+    if assert_env_vars(aws_sts_cred_keys()) == True:
+        return True
+    
+    asserted = assert_env_vars(aws_cred_keys())
+
+    if asserted == True:
+        return True
+        
+    raise MissingCredsException("Missing credentials in env vars: {}".format(", ".join(asserted)))
+    
+
+def assert_azurerm_sp_creds():
+    asserted = assert_env_vars(azurerm_sp_cred_keys())
+    if asserted == True:
+        return True
+        
+    raise MissingCredsException("Missing credentials in env vars: {}".format(", ".join(asserted)))
+  

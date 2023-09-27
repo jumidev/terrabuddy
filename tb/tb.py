@@ -82,13 +82,13 @@ def main(argv=[]):
         DEBUG = True
         log("debug mode enabled")
 
-    (exitcode, path, err) = run("which terraform")
+    (out, err, exitcode) = run("which terraform")
     terraform_path = None
     if exitcode == 0:
-        terraform_path = path.strip()
+        terraform_path = out.strip()
 
     u = Utils(
-        terraform_path = os.getenv("TERRAFORM_BIN", terraform_path)
+        terraform_path = terraform_path
     )
     u.setup(args)
 
