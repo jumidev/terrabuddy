@@ -22,7 +22,7 @@ from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.shortcuts import input_dialog
 from prompt_toolkit.shortcuts import message_dialog
-from prompt_toolkit.shortcuts import yes_no_dialog
+from prompt_toolkit.shortcuts import yes_no_dialog, button_dialog
 
 
 class NewProject():
@@ -300,21 +300,21 @@ class SetupTfStateStorage(NewProject):
                 raise HclParseException("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
 
 
-    def existing_setup(self):
+    def existing_tfstate_store_setup(self):
         try:
             o = self.load()
             if "tfstate_store" not in o:
-                return False
+                return (False, False)
         except:
-            return False
+            return (False, False)
         
         tfstate_store = o["tfstate_store"]
         if "bucket" in tfstate_store:
-            return "aws"
+            return ("aws", tfstate_store.items())
         elif "storage_account" in tfstate_store:
-            return "azure"
+            return ("azure", tfstate_store.items())
         elif "path" in tfstate_store:
-            return "path"
+            return ("path", tfstate_store.items())
         
         return False
 
@@ -334,11 +334,15 @@ class SetupTfStateStorage(NewProject):
             text='Directory is not setup as a project, please make a New project first.').run()
             return
 
-        existing = self.existing_setup()
+        (existing, items) = self.existing_tfstate_store_setup()
         if existing != False:
+            i = ["\n"]
+            for k,v in items:
+                i.append("{} = {}".format(k,v))
+            i.append("\n")
             ans = yes_no_dialog(
             title='Hmm....',
-            text='It looks like you already have tfstate_store configured for {}.\nProceed anyway?'.format(existing)).run()
+            text='tfstate_store currently configured for {}.\n{}\nReconfigure from scratch?'.format(existing, "\n".join(i))).run()
             
             if not ans:
                 return
@@ -462,9 +466,10 @@ class SetupCreds():
             creds.append("azure")
         
         if len(creds) > 0:
-            ans = yes_no_dialog(
+            ans = button_dialog(
             title='Hmm....',
-            text='It looks like you already have credentials configured for {}.\nProceed anyway?'.format(" and ".join(creds))).run()
+            buttons=[("Leave as-is", False), ("Reconfigure", True)],
+            text='Credentials already configured for {}.\nReconfigure credentials?'.format(" and ".join(creds))).run()
             
             if not ans:
                 return
@@ -543,10 +548,13 @@ class SetupCreds():
 
                     if not direnv:
                         ok = message_dialog(
-                        title='direnv not installed',
-                        text='It looks like direnv is not installed.  Check out https://direnv.net/docs/installation.html').run()
+                        title='Oops...',
+                        text='direnv is not installed.  Check out https://direnv.net/docs/installation.html').run()
 
 def main(argv=[]):
+
+    proj = NewProject()
+
 
     parser = argparse.ArgumentParser(description='',
     add_help=True,
@@ -564,9 +572,6 @@ def main(argv=[]):
             "title" : "{} Main Menu".format(PACKAGE),
             "text"  : "Current working directory is {}\nSelect from the following options".format(os.path.abspath(os.getcwd())),
             "items" : [
-                ("new_project", "New project"),
-                ("creds", "Setup/check cloud credentials"),
-                ("tfstore_setup", "Setup/check tfstate storage"),
                 ("terraform", "Install/upgrade terraform"),
                 (None, "Exit")
 
@@ -576,10 +581,24 @@ def main(argv=[]):
         
     }
     
+
+
     result = "new_project"
+    if proj.project_already_setup:
+        result = "creds"
+
     while result != None:
+        menuvalues = list(menu["main"]["items"])
+
+        if proj.project_already_setup:
+            menuvalues.insert(0,("tfstore_setup", "Setup/check tfstate storage"))
+            menuvalues.insert(0,("creds", "Setup/check cloud credentials"))
+        else:
+            menuvalues.insert(0,('new_project', 'New Project'))
+
+
         result = radiolist_dialog(
-            values=menu["main"]["items"],
+            values=menuvalues,
             title=menu["main"]["title"],
             text=menu["main"]["text"],
             default = result
@@ -589,7 +608,6 @@ def main(argv=[]):
 
         if result == 'new_project':
 
-            proj = NewProject()
             proj.tui()
 
         if result == "terraform":
@@ -598,6 +616,10 @@ def main(argv=[]):
                 u.terraform_currentversion()
                 if result in missing:
                     u.install_terraform()
+                    ok = message_dialog(
+                    title='Success',
+                    text='terraform {} successfully installed.'.format(u.terraform_currentversion()[0])).run()
+                    continue
                 if result in outdated:
                     ans = yes_no_dialog(
                     title='{} is out of date'.format(result),
@@ -618,8 +640,8 @@ def main(argv=[]):
             c.tui()
 
         if result == "tfstore_setup":
-            proj = SetupTfStateStorage()
-            proj.tui()
+            tfproj = SetupTfStateStorage()
+            tfproj.tui()
 
                 
 
