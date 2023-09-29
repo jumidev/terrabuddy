@@ -96,7 +96,14 @@ def main(argv=[]):
         return 0
 
     # grab args
-    tfstate_store_encryption_passphrase = os.getenv("TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE", None)
+    tfstate_store_encryption_passphrases = []
+    e = list(os.environ.keys())
+    e.sort()
+
+    for k in e:
+        if k.startswith("TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"):
+            tfstate_store_encryption_passphrases.append(os.getenv(k))
+
     git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
     force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
@@ -217,8 +224,7 @@ def main(argv=[]):
         t = project.component_type(component=cdir)
         if t == "component":
             project.parse_template()
-            if tfstate_store_encryption_passphrase != None:
-                project.set_passphrase(tfstate_store_encryption_passphrase)
+            project.set_passphrases(tfstate_store_encryption_passphrases)
 
             project.setup_component_tfstore()
             project.save_outfile()
@@ -292,8 +298,8 @@ def main(argv=[]):
                     #     raise TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
                     
                     crs = project.componenttfstore
-                    if tfstate_store_encryption_passphrase != None:
-                        crs.set_passphrase(tfstate_store_encryption_passphrase)
+                    if tfstate_store_encryption_passphrases != []:
+                        crs.set_passphrases(tfstate_store_encryption_passphrases)
                         crs.encrypt()
 
                     # save tfstate

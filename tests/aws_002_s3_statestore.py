@@ -83,7 +83,7 @@ class TestTbAwsS3StateStore(unittest.TestCase):
         random_passphrase = get_random_string(64)
 
         assert not crs.is_encrypted
-        crs.set_passphrase(random_passphrase)
+        crs.set_passphrases([random_passphrase])
         assert crs.encrypt()
 
         assert crs.is_encrypted
@@ -101,7 +101,7 @@ class TestTbAwsS3StateStore(unittest.TestCase):
         assert crs.is_encrypted
 
         wrong_passphrase = get_random_string(20)
-        crs.set_passphrase(wrong_passphrase)
+        crs.set_passphrases([wrong_passphrase])
 
         try:
             crs.decrypt()

@@ -10,7 +10,7 @@ from pathlib import Path
 import re, tempfile
 import time, shutil
 import argparse
-import hcl
+import hcl, string, random
 
 import boto3
 
@@ -24,8 +24,13 @@ from prompt_toolkit.shortcuts import input_dialog
 from prompt_toolkit.shortcuts import message_dialog
 from prompt_toolkit.shortcuts import yes_no_dialog, button_dialog
 
+def get_random_string(length):
+    # choose from all lowercase letter
+    l1 = string.ascii_lowercase + string.ascii_uppercase
+    result_str = ''.join(random.choice(l1) for i in range(length))
+    return str(result_str)
 
-class NewProject():
+class ProjectSetup():
 
     def __init__(self) -> None:
         self.name = None
@@ -36,8 +41,7 @@ class NewProject():
 
         # can be over ridden for testing purposes
         self.dir = os.path.abspath(os.getcwd())
-
-
+    
     def checkstr(self, s):
         regex = r"^[a-zA-Z0-9_-]*$"
         matches = re.search(regex, s)
@@ -172,7 +176,7 @@ class NewProject():
         elif self.git_clone != None:
             txt.append("✓ will be cloned from {}".format(self.git_clone))
 
-        if self.envs != None:
+        if self.envs != None and len(self.envs) > 0:
             txt.append("✓ {} root level environments will be created: {}".format(len(self.envs), ", ".join(self.envs)))
 
         result = yes_no_dialog(
@@ -273,7 +277,7 @@ class NewProject():
             with open("{}/README.md".format(self.root_dir), "w") as fh:
                 fh.write("\n".join(md))
 
-class SetupTfStateStorage(NewProject):
+class SetupTfStateStorage(ProjectSetup):
     
     @property
     def tfstate_file(self):
@@ -299,7 +303,6 @@ class SetupTfStateStorage(NewProject):
             except:
                 raise HclParseException("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
 
-
     def existing_tfstate_store_setup(self):
         try:
             o = self.load()
@@ -316,7 +319,7 @@ class SetupTfStateStorage(NewProject):
         elif "path" in tfstate_store:
             return ("path", tfstate_store.items())
         
-        return False
+        return (False, False)
 
 
     def tui(self):
@@ -422,6 +425,7 @@ class SetupTfStateStorage(NewProject):
             pass
 
 
+
 class SetupCreds():
 
     @property
@@ -508,7 +512,8 @@ class SetupCreds():
                         if ans:
                             continue
                         return
-                    
+
+                 
 
 
             if result == "azure":
@@ -551,9 +556,11 @@ class SetupCreds():
                         title='Oops...',
                         text='direnv is not installed.  Check out https://direnv.net/docs/installation.html').run()
 
+                    return
+
 def main(argv=[]):
 
-    proj = NewProject()
+    proj = ProjectSetup()
 
 
     parser = argparse.ArgumentParser(description='',
@@ -581,8 +588,6 @@ def main(argv=[]):
         
     }
     
-
-
     result = "new_project"
     if proj.project_already_setup:
         result = "creds"
@@ -591,8 +596,36 @@ def main(argv=[]):
         menuvalues = list(menu["main"]["items"])
 
         if proj.project_already_setup:
-            menuvalues.insert(0,("tfstore_setup", "Setup/check tfstate storage"))
+            creds = []
+
+            # aws creds
+            aws = False
+            try:
+                aws = assert_aws_creds()
+            except:
+                pass
+
+            # azure creds
+            azure = False
+            try:
+                azure = assert_azurerm_sp_creds()
+            except:
+                pass
+
+            if aws:
+                creds.append("aws")
+            if azure:
+                creds.append("azure")
+                
+            if len(creds) > 0:
+                tfproj = SetupTfStateStorage()
+                (setup, t) = tfproj.existing_tfstate_store_setup()
+                if setup:
+                    menuvalues.insert(0,("tfstore_setup_encryption", "Setup/check tfstate storage encryption"))
+
+                menuvalues.insert(0,("tfstore_setup", "Setup/check tfstate storage"))
             menuvalues.insert(0,("creds", "Setup/check cloud credentials"))
+
         else:
             menuvalues.insert(0,('new_project', 'New Project'))
 
@@ -634,14 +667,82 @@ def main(argv=[]):
                 ok = message_dialog(
                 title='Error',
                 text='Could not check {}\n {}.'.format(result, str(e))).run()
+            time.sleep(0.3)
+
+        if result == "tfstore_setup_encryption":
+            tfstate_store_encryption_passphrases = []
+            e = list(os.environ.keys())
+            e.sort()
+
+            for k in e:
+                if k.startswith("TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"):
+                    v = os.getenv(k)
+                    p = v[:5] + '*'*(len(v)-5)
+                    tfstate_store_encryption_passphrases.append("{}={}".format(k, p))
+
+            if len(tfstate_store_encryption_passphrases) > 0:
+
+                ans = button_dialog(
+                title='Already setup',
+                buttons=[("Leave as-is", False), ("Change password", True)],
+                text='Tfstate encryption already configured:\n\n{}\n\nChange password?'.format("\n".join(tfstate_store_encryption_passphrases))).run()
+                
+                if not ans:
+                    continue
+                ans = button_dialog(
+                title='Confirm',
+                buttons=[("Cancel", False), ("Change password", True)],
+                text='A new passphrase will be generated and saved to .envrc. The current passphrase will be saved to TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD.  As tb apply is run, tfstate files will be decrypted using the old password and reencrypted using the new. Any other users or tasks that read the tfstate will need to have the encryption key to read them.').run()
+
+                if not ans:
+                    continue
+             
+
+            else:
+
+                ans = button_dialog(
+                title='Confirm',
+                buttons=[("Cancel", False), ("Enable", True)],
+                text='A strong encryption passphrase will be generated and saved to .envrc.  Any unencrypted tfstate files will be encrypted on the next apply. Any other users or tasks that read the tfstate will need to have the encryption key to read them.  Enable at-rest tfstate encryption?').run()
+
+                if not ans:
+                    continue 
+                
+            passphrase = get_random_string(48)
+            Path(".envrc").touch()
+
+            envrc = []
+            with open(".envrc", 'r') as fh:
+                for line in fh.readlines():
+                    if line.startswith("export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE="):
+                        line = "export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD="+line.split("=",1)[1]+"\n"
+                        os.environ["TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD"] = line.split("=",1)[1]
+
+                    envrc.append(line)
+
+
+            envrc.append("export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE={}".format(passphrase))
+            with open(".envrc", 'w') as fh:
+                for l in envrc:
+                    fh.writelines(l)
+
+            os.environ["TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"] = passphrase
+
+            message_dialog(
+            title='Done',
+            text='TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE saved to .envrc.').run()
+
+            time.sleep(0.3)
 
         if result == "creds":
             c = SetupCreds()
             c.tui()
+            time.sleep(0.3)
 
         if result == "tfstore_setup":
             tfproj = SetupTfStateStorage()
             tfproj.tui()
+            time.sleep(0.3)
 
                 
 

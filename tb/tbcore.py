@@ -351,11 +351,12 @@ class Project():
         self.git_filtered = git_filtered
         self.conf_marker = conf_marker
         self.remotestates = None
-        self.passphrase = None
+        # all used to decrypt, first used to re encrypt
+        self.passphrases = []
         self.override_vars = override_vars
 
-    def set_passphrase(self, passphrase):
-        self.passphrase = passphrase
+    def set_passphrases(self, passphrases=[]):
+        self.passphrases = passphrases
 
     def set_tf_dir(self, dir):
         self.tf_dir = dir
@@ -602,9 +603,9 @@ class Project():
             crs = self.component.get_tfstate_store_instance()
 
             if crs.is_encrypted:
-                if self.passphrase == None:
+                if self.passphrases == []:
                     raise MissingEncryptionPassphrase("Remote state for component is encrypted, you must provide a decryption passphrase")
-                crs.set_passphrase(self.passphrase)
+                crs.set_passphrases(self.passphrases)
                 crs.decrypt()
 
             self.componenttfstore = crs
@@ -957,29 +958,27 @@ class TfStateReader():
         return value
 
 class TfStateStore():
-    BLOCK_SIZE = 16
 
     def __init__(self, args, localpath) -> None:
         self.args = args
         self.localpath = localpath
-        self.passphrase = None
+        self.passphrases = []
         self.fetched = False
 
         unpad = lambda s: s[:-ord(s[len(s) - 1:])]
  
-    def set_passphrase(self, passphrase):
-        self.passphrase = passphrase
+    def set_passphrases(self, passphrases=[]):
+        self.passphrases = passphrases
     
     def encrypt(self) -> bool:
-        if self.passphrase == None:
+        if self.passphrases == []:
             raise Exception("No passphrase given")
             
         with open(self.localpath, 'r') as fh:
             content = fh.read()
     
-        private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
-        sha256 = hashlib.sha256(content.encode("utf-8")).digest()
-        pad = lambda s: s + (self.BLOCK_SIZE - len(s) % self.BLOCK_SIZE) * chr(self.BLOCK_SIZE - len(s) % self.BLOCK_SIZE)
+        private_key = hashlib.sha256(self.passphrases[0].encode("utf-8")).digest()
+        pad = lambda s: s + (AES.block_size - len(s) % AES.block_size) * chr(AES.block_size - len(s) % AES.block_size)
         padded = pad(content)
         iv = get_random_bytes(AES.block_size)
         cipher = AES.new(private_key, AES.MODE_CBC, iv)
@@ -989,13 +988,12 @@ class TfStateStore():
         with open(self.localpath, 'w') as fh:
             json.dump({
                 'ciphertext':  b64encode(ciphertext).decode('utf-8'),
-                'sha256' : b64encode(sha256).decode('utf-8'),
                 'iv': b64encode(iv).decode('utf-8')}, fh)
         
         return True
 
     def decrypt(self) -> bool:
-        if self.passphrase == None:
+        if self.passphrases == []:
             raise Exception("No passphrase given")
         
         with open(self.localpath, 'r') as fh:
@@ -1003,33 +1001,30 @@ class TfStateStore():
 
         unpad = lambda s: s[:-ord(s[len(s) - 1:])]
 
-
         iv = b64decode(obj['iv'])
         ciphertext = b64decode(obj['ciphertext'])
-        sha256 = b64decode(obj['sha256'])
 
-        private_key = hashlib.sha256(self.passphrase.encode("utf-8")).digest()
+        for passphrase in self.passphrases:
+            private_key = hashlib.sha256(passphrase.encode("utf-8")).digest()
 
-        cipher = AES.new(private_key, AES.MODE_CBC, iv)
+            cipher = AES.new(private_key, AES.MODE_CBC, iv)
 
-        plaintext = unpad(cipher.decrypt(ciphertext))
+            plaintext = unpad(cipher.decrypt(ciphertext))
 
-        this_sha256 = hashlib.sha256(plaintext).digest()
+            if len(plaintext) > 0:
 
-        if this_sha256 != sha256:
-            raise WrongPasswordException("Wrong decryption passphrase")
-        with open(self.localpath, "w") as fh:
-            fh.write(plaintext.decode("utf-8"))
+                try:
+                    plaintext = plaintext.decode("utf-8")
+                    with open(self.localpath, "w") as fh:
+                        fh.write(plaintext)
 
-        return True
+                    return True
+                except:
+                    continue
 
+        raise WrongPasswordException("Wrong decryption passphrase")
             
-            
 
-        
-        
-
-        
     @property
     def is_encrypted(self):
 

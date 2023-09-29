@@ -17,13 +17,14 @@ docker run -it test-terrabuddy
 - ~~test componentsource git tag~~
 - ~~test vars.yml variables~~
 - ~~test creating multiple vpc subnets using map and tfstate link~~
-- test project tfstate setup
-   - init project
-   - setup s3
-   - setup azure
-   - setup encryption
+- tb_setup
+   - ~~init project~~
+   - ~~setup s3 tfstate store~~
+   - ~~setup azure creds~~
+   - setup azure tfstate store
+   - ~~setup tfstate encryption~~
    - setup linked project(s)
-- setup multiple encryption keys
+   - ~~setup multiple encryption keys~~
 - test tfstate values
 - test fetching value(s) from tfstates
 - test azurerm

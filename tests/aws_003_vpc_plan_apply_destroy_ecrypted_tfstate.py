@@ -17,8 +17,9 @@ TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
 
 def get_random_string(length):
     # choose from all lowercase letter
-    letters = string.ascii_lowercase
-    result_str = ''.join(random.choice(letters) for i in range(length))
+    l1 = string.ascii_lowercase
+    l2 = string.ascii_uppercase
+    result_str = ''.join(random.choice(l1+12) for i in range(length))
     return str(result_str)
 
 class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
