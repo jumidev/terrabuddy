@@ -107,14 +107,14 @@ def main(argv=[]):
     git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
     force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
-    override_vars = {}
+    project_vars = {}
 
     if args.set_var != None:
         for set_var in args.set_var:
             k,v = set_var[0].split("=", 1)
-            override_vars[k] = v
+            project_vars[k] = v
 
-    project = Project(git_filtered=git_filtered, override_vars=override_vars)
+    project = Project(git_filtered=git_filtered, project_vars=project_vars)
     wt = WrapTerraform(terraform_path=u.terraform_path)
 
     if args.downstream_args != None:

@@ -4,25 +4,14 @@
 import os, sys, shutil
 import unittest
 from tbcore import Project, TfStateStoreAwsS3, WrongPasswordException
-from tbcore import assert_aws_creds
+from tbcore import assert_aws_creds, get_random_string
 import hcl, tempfile, datetime
 from pathlib import Path
 import random
 import string
 
 
-path = os.path.dirname(os.path.realpath(__file__))+'/../tb'
-pylib = os.path.abspath(path)
-sys.path.append(pylib)
-
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
-
-def get_random_string(length):
-    # choose from all lowercase letter
-    letters = string.ascii_lowercase
-    result_str = ''.join(random.choice(letters) for i in range(length))
-    return str(result_str)
-
 
 class TestTbAwsS3StateStore(unittest.TestCase):
 

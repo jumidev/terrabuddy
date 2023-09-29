@@ -7,6 +7,10 @@ python-Levenshtein
 requests
 gitpython
 
+urllib3<2
 boto3
 PyCryptodome
 prompt_toolkit
+
+azure-cli
+azure-storage-blob

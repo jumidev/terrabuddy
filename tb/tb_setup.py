@@ -4,13 +4,13 @@
 import sys,  yaml, os
 
 from tbcore import log, Utils, assert_aws_creds, assert_azurerm_sp_creds, azurerm_sp_cred_keys, aws_cred_keys, aws_test_creds
-from tbcore import git_rootdir, run, HclParseException
+from tbcore import git_rootdir, run, HclParseException, get_random_string
 from git import Repo
 from pathlib import Path
 import re, tempfile
 import time, shutil
 import argparse
-import hcl, string, random
+import hcl
 
 import boto3
 
@@ -23,12 +23,6 @@ from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.shortcuts import input_dialog
 from prompt_toolkit.shortcuts import message_dialog
 from prompt_toolkit.shortcuts import yes_no_dialog, button_dialog
-
-def get_random_string(length):
-    # choose from all lowercase letter
-    l1 = string.ascii_lowercase + string.ascii_uppercase
-    result_str = ''.join(random.choice(l1) for i in range(length))
-    return str(result_str)
 
 class ProjectSetup():
 

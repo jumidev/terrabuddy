@@ -1,0 +1,9 @@
+source {
+	repo = "https://github.com/jumidev/terraform-modules-azure.git"
+	path = "network/virtual_network"
+}
+
+inputs {
+	name = "example virtual_network"
+	cidr_block = "192.168.0.0/16"
+}

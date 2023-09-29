@@ -7,7 +7,7 @@ import tempfile
 from subprocess import Popen, PIPE
 import requests
 from collections import OrderedDict
-import re, hashlib
+import re, hashlib, string, random
 from pathlib import Path
 from copy import deepcopy
 
@@ -22,9 +22,18 @@ import boto3
 from botocore.exceptions import ClientError
 import botocore
 
+from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.identity import EnvironmentCredential
+
 PACKAGE = "tb"
 LOG = True
 DEBUG=False
+
+def get_random_string(length):
+    # choose from all lowercase letter
+    l1 = string.ascii_lowercase + string.ascii_uppercase
+    result_str = ''.join(random.choice(l1) for i in range(length))
+    return str(result_str)
 
 def anyof(needles, haystack):
     for n in needles:
@@ -340,7 +349,7 @@ class Project():
         git_filtered=False,
         conf_marker="project.yml",
         inpattern=".hclt",
-        override_vars={}):
+        project_vars={}):
 
         self.inpattern=inpattern
         self.component_dir=None
@@ -353,7 +362,7 @@ class Project():
         self.remotestates = None
         # all used to decrypt, first used to re encrypt
         self.passphrases = []
-        self.override_vars = override_vars
+        self.project_vars = project_vars
 
     def set_passphrases(self, passphrases=[]):
         self.passphrases = passphrases
@@ -656,6 +665,10 @@ class Project():
                 except KeyError:
                     raise ComponentException("tfstate_links {} No such output in component {}".format(which, v))
 
+        for k in cloud_cred_keys():
+            if k in os.environ:
+                inputs[k.lower()] = os.environ[k]
+
         return inputs
 
 
@@ -720,8 +733,8 @@ class Project():
 
     def parsetext(self, s):
 
-        # self.override_vars
-        for (k, v) in self.override_vars.items():
+        # self.project_vars
+        for (k, v) in self.project_vars.items():
             s = s.replace('${' + k + '}', v)
 
         # self.vars
@@ -1079,7 +1092,41 @@ class TfStateStoreAwsS3(TfStateStore):
         self.fetched = True
 
 class TfStateStoreAzureStorage(TfStateStore):
-    pass
+
+    @property
+    def az_blob_client(self):
+        account = self.args["storage_account"]
+        account_url = "{}.blob.core.windows.net".format(account)
+        container_path = self.args["container_path"]
+        blob_path = '{}/terraform.tfvars'.format(container_path)
+
+        credential = EnvironmentCredential()
+        blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
+        container_name = self.args["container"]
+        return blob_service_client.get_blob_client(container=container_name, blob=blob_path)
+
+    def fetch(self):
+        # https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-download-python#download-to-a-stream
+
+        blob_client = self.az_blob_client
+        downloader = blob_client.download_blob(max_concurrency=1, encoding='UTF-8')
+        blob_text = downloader.readall()
+
+        with open(self.localpath, 'wb') as fh:
+            fh.write(blob_text)
+
+        self.fetched = True
+
+    def push(self):
+        # https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-download-python#download-to-a-stream
+        blob_client = self.az_blob_client
+
+        container_path = self.args["container_path"]
+        blob_path = '{}/terraform.tfvars'.format(container_path)
+
+        with open(self.localpath, 'wb') as fh:
+            blob_client.upload_blob(name=blob_path, data=fh, overwrite=True)
+
 
 class TfStateStoreFilesystem(TfStateStore):
     def push(self):
@@ -1334,7 +1381,10 @@ def aws_cred_keys():
     return ("AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY")
 
 def azurerm_sp_cred_keys():
-    return ("ARM_CLIENT_ID", "ARM_CLIENT_SECRET", "ARM_TENANT_ID", "ARM_SUBSCRIPTION_ID")
+    return ("AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_TENANT_ID", "AZURE_SUBSCRIPTION_ID")
+
+def cloud_cred_keys():
+    return list(set(aws_sts_cred_keys() + azurerm_sp_cred_keys() + aws_cred_keys()))
 
 
 def aws_test_creds():

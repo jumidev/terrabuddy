@@ -69,7 +69,7 @@ class TestTbAwsPlanVpc(unittest.TestCase):
         assert count == 1
 
         # check that remote state is present on s3
-        project = Project(git_filtered=False, override_vars={'run_id': self.run_string})
+        project = Project(git_filtered=False, project_vars={'run_id': self.run_string})
         project.set_component_dir(cdir)
         project.parse_template()
         obj = hcl.loads(project.hclfile)

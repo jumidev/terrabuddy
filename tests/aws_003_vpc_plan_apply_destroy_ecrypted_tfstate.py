@@ -5,7 +5,7 @@ import os, sys, hcl, tempfile, json
 import unittest
 import tb
 from tbcore import Project, TfStateStoreAwsS3
-from tbcore import assert_aws_creds
+from tbcore import assert_aws_creds, get_random_string
 import random
 import string
 
@@ -14,13 +14,6 @@ from botocore.exceptions import ClientError
 import botocore
 
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
-
-def get_random_string(length):
-    # choose from all lowercase letter
-    l1 = string.ascii_lowercase
-    l2 = string.ascii_uppercase
-    result_str = ''.join(random.choice(l1+12) for i in range(length))
-    return str(result_str)
 
 class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
 
@@ -73,7 +66,7 @@ class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
         assert count == 1
 
         # check that remote state is present on s3
-        project = Project(git_filtered=False, override_vars={'run_id': self.run_string})
+        project = Project(git_filtered=False, project_vars={'run_id': self.run_string})
         project.set_component_dir(cdir)
         project.parse_template()
         obj = hcl.loads(project.hclfile)
