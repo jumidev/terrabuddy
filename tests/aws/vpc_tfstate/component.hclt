@@ -1,0 +1,14 @@
+source {
+	repo = "https://github.com/jumidev/terraform-modules-aws.git"
+	path = "network/vpc"
+}
+
+inputs {
+	name = "example vpc ${run_id}"
+	cidr_block = "192.168.0.0/16"
+}
+
+tfstate_store {
+	bucket = "${test_bucket}"
+	bucket_path = "test/${run_id}/${COMPONENT_PATH}"
+}

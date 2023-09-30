@@ -1,0 +1,9 @@
+source {
+	repo = "https://github.com/jumidev/terraform-modules-azure.git"
+	path = "resource_group"
+}
+
+inputs {
+	name = "test_${run_id}"
+	location = "northeurope"
+}

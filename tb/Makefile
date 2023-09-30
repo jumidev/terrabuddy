@@ -1,14 +1,8 @@
-test:
-	@bash install.sh test
+SHELL := /bin/bash
 
-deps:
-	@bash install.sh deps
-
-install: deps
-	@bash install.sh install
+install: uninstall
+	python3 setup.py install --user
 
 uninstall:
-	@bash install.sh uninstall
+	pip3 uninstall terrabuddy -y
 
-install_dev: deps
-	@bash install.sh install_dev

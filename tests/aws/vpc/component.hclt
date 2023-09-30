@@ -1,0 +1,9 @@
+source {
+	repo = "https://github.com/jumidev/terraform-modules-aws.git"
+	path = "network/vpc"
+}
+
+inputs {
+	name = "example vpc"
+	cidr_block = "192.168.0.0/16"
+}
