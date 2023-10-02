@@ -21,13 +21,15 @@ docker run -it test-terrabuddy
    - ~~init project~~
    - ~~setup s3 tfstate store~~
    - ~~setup azure creds~~
-   - setup azure tfstate store
+   - ~~setup azure tfstate store~~
    - ~~setup tfstate encryption~~
    - setup linked project(s)
    - ~~setup multiple encryption keys~~
 - test tfstate values
+- ~~test hcl dumping -> strings, lists, maps, recursively~~
 - test fetching value(s) from tfstates
 - test azurerm
+   - ~~rg and tfstate~~
 - test aws bundle
 - test tb showvars
 - test aws sts auth

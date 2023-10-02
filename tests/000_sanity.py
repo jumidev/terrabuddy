@@ -4,6 +4,9 @@
 import unittest
 import yaml
 import tb, tbcore
+from tbcore import hcldump, get_random_string
+import hcl
+
 
 class TestTbSanity(unittest.TestCase):
 
@@ -63,6 +66,53 @@ class TestTbSanity(unittest.TestCase):
         retcode = tb.main(["tb", "apply", "mock/withvars", "--dry"])
         print(retcode)
         assert retcode == None
+
+    def test_hcldump(self):
+        l1 = ["horses", "dogs", 'cats', "mice", "owls"]
+        l2 = ["asia", "europe", "northamerica", 'africa', 'australia', "southamerica"]
+        l3 = [23,24,65,98,6555]
+
+        # simple list, should fail
+        try:
+            hcls = hcldump(l1)
+            assert False
+        except tbcore.HclDumpException:
+            pass
+
+        # dict of strs, should succeed
+        o = {}
+        for k in l2:
+            o[k] = get_random_string(10)
+
+        hcls = hcldump(o)
+
+        o2 = hcl.loads(hcls)
+        assert type(o2) == dict
+
+        # dict of ints, should succeed
+        o = {}
+        i = 0
+        for k in l1:
+            o[k] = l3[i]
+            i+=1
+
+        hcls = hcldump(o)
+
+        o2 = hcl.loads(hcls)
+        assert type(o2) == dict
+
+        # dict of list of strs, should succeed
+        o = {}
+        for k in l1:
+            o[k] = []
+            for k2 in l2:
+                o[k].append(k2)
+
+        hcls = hcldump(o)
+
+        o2 = hcl.loads(hcls)
+        assert type(o2) == dict
+
 
 
 if __name__ == '__main__':

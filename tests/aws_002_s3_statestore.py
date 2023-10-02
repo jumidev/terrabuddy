@@ -13,6 +13,7 @@ import string
 
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
 
+
 class TestTbAwsS3StateStore(unittest.TestCase):
 
     def setUp(self):

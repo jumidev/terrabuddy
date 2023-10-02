@@ -7,3 +7,9 @@ inputs {
 	name = "test_${run_id}"
 	location = "northeurope"
 }
+
+tfstate_store {
+	storage_account = "${storage_account}"
+	container = "${container}"
+	container_path = "test/${run_id}/${COMPONENT_PATH}"
+}

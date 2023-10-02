@@ -17,13 +17,17 @@ from Crypto.Random import get_random_bytes
 
 from git import Repo, Remote, InvalidGitRepositoryError
 import time
+from datetime import datetime, timedelta
 
 import boto3
 from botocore.exceptions import ClientError
 import botocore
 
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
+from azure.storage.blob import BlobServiceClient, BlobSasPermissions, generate_blob_sas
 from azure.identity import EnvironmentCredential
+from azure.mgmt.storage import StorageManagementClient
+from azure.mgmt.resource  import  ResourceManagementClient
+from azure.core.exceptions import ResourceNotFoundError
 
 PACKAGE = "tb"
 LOG = True
@@ -41,6 +45,53 @@ def anyof(needles, haystack):
             return True
 
     return False
+
+def hcldump(obj):
+    hcls = ""
+    for f in hcldumplines(obj):
+        hcls = "{}{}".format(hcls, f)
+
+    return hcls
+
+
+class HclDumpException(Exception):
+    pass
+
+HCL_KEY_RE = r"^\w+$"
+
+def hcldumplines(obj, recursions=0):
+    nextrecursion = recursions+1
+    if recursions == 0 and type(obj) != dict:
+        raise HclDumpException("Top level object must be a dictionary")
+
+    if type(obj) == dict:
+        if recursions > 0:
+            yield " "*recursions+'{\n'
+        for k,v in obj.items():
+            matches = re.findall(HCL_KEY_RE, k)
+            if len(matches) == 0:
+                raise HclDumpException("dictionary keys can only contain letters, numbers and underscores")
+            yield '{}{} = '.format(" "*recursions, k)
+            yield from hcldumplines(v, nextrecursion)
+            yield "{}\n".format(" "*recursions)
+        if recursions > 0:
+            yield " "*recursions+'}\n'
+    elif type(obj) == list:
+        yield '{}['.format(" "*recursions)
+
+        i = 0
+        m = len(obj)-1
+        while i <= m:
+            yield from hcldumplines(obj[i], nextrecursion)
+            if i < m:
+                yield ","
+            i+=1
+        yield ']\n'
+    elif type(obj) in (int, float):
+        yield obj
+
+    elif type(obj) == str:
+        yield '"'+obj+'"'
 
 def stylelog(s):
     if type(s) is str:
@@ -1091,7 +1142,91 @@ class TfStateStoreAwsS3(TfStateStore):
     
         self.fetched = True
 
+
+class AzureUtils():
+
+    def __init__(self) -> None:
+        self.creds = None
+        self.rmc = None
+        self.smc = None
+
+    @property
+    def credential(self):
+        if self.creds == None:
+            self.creds = EnvironmentCredential()
+
+
+        return self.creds
+
+    @property
+    def subscription_id(self):
+        return os.environ["AZURE_SUBSCRIPTION_ID"]
+
+    @property
+    def resource_client(self):
+        if self.rmc == None:
+            self.rmc = ResourceManagementClient(self.credential,  self.subscription_id)
+
+
+        return self.rmc
+
+    @property
+    def storage_management_client(self):
+        if self.smc == None:
+            self.smc = StorageManagementClient(self.credential,  self.subscription_id)
+
+
+        return self.smc
+
+    def get_storage_account(self, name):
+        resourcelist=self.resource_client.resource_groups.list()
+        for rg in resourcelist:
+            for  res  in  self.resource_client.resources.list_by_resource_group(rg.name):
+                if(res.type=='Microsoft.Storage/storageAccounts'):
+                    if res.name == name:
+                        return (rg.name, res.name)
+                    
+    def get_storage_account_key(self, name):
+        (rg, name) = self.get_storage_account(name)
+
+        keys = self.storage_management_client.storage_accounts.list_keys(rg,  name)
+
+        return keys.keys[0].value
+
+
+    def generate_sas_token(self, storage_account_name, container, blob_path, valid_hours=1):
+        account_key = self.get_storage_account_key(storage_account_name)
+        token = generate_blob_sas(
+            account_name=storage_account_name,
+            account_key=account_key,
+            container_name=container,
+            blob_name=blob_path,
+            permission=BlobSasPermissions(read=True, write=True, create=True),
+            expiry=datetime.utcnow() + timedelta(hours=valid_hours),
+        )
+        return token
+
+
+
 class TfStateStoreAzureStorage(TfStateStore):
+
+    def __init__(self, args, localpath) -> None:
+        super().__init__(args, localpath)
+        self.token = None
+
+    azure_utils = AzureUtils()
+
+    @property
+    def sas_token(self):
+        if self.token == None:
+            container_path = self.args["container_path"]
+            account = self.args["storage_account"]
+            container = self.args["container"]
+            blob_path = '{}/terraform.tfvars'.format(container_path)
+
+            self.token = self.azure_utils.generate_sas_token(account, container, blob_path)
+
+        return self.token
 
     @property
     def az_blob_client(self):
@@ -1100,8 +1235,7 @@ class TfStateStoreAzureStorage(TfStateStore):
         container_path = self.args["container_path"]
         blob_path = '{}/terraform.tfvars'.format(container_path)
 
-        credential = EnvironmentCredential()
-        blob_service_client = BlobServiceClient(account_url=account_url, credential=credential)
+        blob_service_client = BlobServiceClient(account_url=account_url, credential=self.sas_token)
         container_name = self.args["container"]
         return blob_service_client.get_blob_client(container=container_name, blob=blob_path)
 
@@ -1109,13 +1243,17 @@ class TfStateStoreAzureStorage(TfStateStore):
         # https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-download-python#download-to-a-stream
 
         blob_client = self.az_blob_client
-        downloader = blob_client.download_blob(max_concurrency=1, encoding='UTF-8')
-        blob_text = downloader.readall()
+        try:
+            downloader = blob_client.download_blob(max_concurrency=1, encoding='UTF-8')
+            blob_text = downloader.readall()
 
-        with open(self.localpath, 'wb') as fh:
-            fh.write(blob_text)
+            with open(self.localpath, 'wb') as fh:
+                fh.write(blob_text)
 
-        self.fetched = True
+            self.fetched = True
+        except ResourceNotFoundError:
+            Path(self.localpath).touch()
+            self.fetched = True
 
     def push(self):
         # https://learn.microsoft.com/en-us/azure/storage/blobs/storage-blob-download-python#download-to-a-stream
@@ -1124,8 +1262,8 @@ class TfStateStoreAzureStorage(TfStateStore):
         container_path = self.args["container_path"]
         blob_path = '{}/terraform.tfvars'.format(container_path)
 
-        with open(self.localpath, 'wb') as fh:
-            blob_client.upload_blob(name=blob_path, data=fh, overwrite=True)
+        with open(self.localpath, 'rb') as fh:
+            blob_client.upload_blob(data=fh, overwrite=True)
 
 
 class TfStateStoreFilesystem(TfStateStore):

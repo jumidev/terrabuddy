@@ -9,7 +9,7 @@ import hashlib
 from pathlib import Path
 import time
 import tbcore
-from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, get_project_root
+from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, get_project_root, hcldump
 from tbcore import Utils, Project, WrapTerraform, TfStateReader
 from tbcore import ComponentSourceGit, ComponentSourcePath
 from tbcore import TfStateStoreAwsS3, TfStateStoreAzureStorage, TfStateStoreFilesystem
@@ -266,10 +266,9 @@ def main(argv=[]):
 
                     project.setup_component_source()
 
+                    tfvars_hcl = hcldump(project.component_inputs)
                     with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
-                        for k,v in project.component_inputs.items():
-                            fh.write("{} = \"{}\"".format(k,v.replace('"', '\\"')))
-                            fh.write("\n")
+                        fh.write(tfvars_hcl)
 
                     # terraform init
                     cmd =  "{} init ".format(wt.tf_bin)
