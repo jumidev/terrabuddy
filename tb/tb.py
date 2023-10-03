@@ -287,18 +287,10 @@ def main(argv=[]):
                     cmd = wt.get_command(command, extra_args)
 
                     exitcode = runshow(cmd, cwd=tf_wdir)
-                    if exitcode != 0:
-                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
-
+                    
                     # our work is done here
                     if command in ["refresh", "plan"]:
                         return 0
-
-                    # # terraform apply
-                    # cmd =  "{} apply -state=terraform.tfstate tfplan".format(wt.tf_bin)
-                    # exitcode = runshow(cmd, cwd=tf_wdir)
-                    # if exitcode != 0:
-                    #     raise TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
                     
                     crs = project.componenttfstore
                     if tfstate_store_encryption_passphrases != []:
@@ -307,6 +299,9 @@ def main(argv=[]):
 
                     # save tfstate
                     crs.push()
+                    if exitcode != 0:
+                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
+
                     return 0
 
         elif t == "bundle":
