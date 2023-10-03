@@ -4,7 +4,7 @@
 import os
 import unittest
 from tbcore import assert_azurerm_sp_creds, get_random_string, AzureUtils
-import datetime, tb, time
+import datetime, tb
 
 TEST_AZURE_STORAGE_ACCOUNT = os.getenv("TEST_AZURE_STORAGE_ACCOUNT", None)
 TEST_AZURE_STORAGE_CONTAINER = os.getenv("TEST_AZURE_STORAGE_CONTAINER", None)

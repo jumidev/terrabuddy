@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, shutil
+import os
 import unittest
 from tbcore import assert_azurerm_sp_creds, get_random_string, AzureUtils
-import hcl, tempfile, datetime, tb
-from pathlib import Path
-
-
-from azure.identity import EnvironmentCredential
+import datetime, tb
 
 TEST_AZURE_STORAGE_ACCOUNT = os.getenv("TEST_AZURE_STORAGE_ACCOUNT", None)
 TEST_AZURE_STORAGE_CONTAINER = os.getenv("TEST_AZURE_STORAGE_CONTAINER", None)

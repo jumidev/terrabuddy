@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, hcl, tempfile, json
+import os
 import unittest
 import tb
 from tbcore import ComponentException
@@ -10,8 +10,6 @@ import random
 import string
 
 import boto3
-from botocore.exceptions import ClientError
-import botocore
 
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
 

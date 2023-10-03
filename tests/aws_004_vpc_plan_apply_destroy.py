@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, sys, hcl, tempfile, json
+import os, hcl, tempfile, json
 import unittest
 import tb
 from tbcore import Project, TfStateStoreAwsS3
@@ -10,9 +10,6 @@ import random
 import string
 
 import boto3
-from botocore.exceptions import ClientError
-import botocore
-
 
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
 
