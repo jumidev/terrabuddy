@@ -1,0 +1,11 @@
+source {
+	repo = "git@github.com:jumidev/test_component_placeholder.git"
+}
+
+inputs {
+	foo = "bar"
+}
+
+tfstate_store {
+	path = "${test_tfstate_path}"
+}

@@ -651,6 +651,22 @@ class Project():
         self.set_component_instance()
         self.componentsource = self.component.get_source_instance()
 
+    def setup_component_file_overrides(self):
+        for (d, fn) in flatwalk(self.component_dir):
+            if fn.endswith(".hclt"):
+                continue
+            if fn.endswith(".hcl"):
+                continue
+
+            dest = self.tf_dir + '/' + d[len(self.component_dir):]
+            
+            if not os.path.isdir(dest):
+                os.makedirs(dest)
+
+            shutil.copy(os.path.join(d, fn), dest)
+
+            #os.copy.copy(self.component_dir, self.tf_dir)
+
     def setup_component_tfstore(self):
         self.set_component_instance()
         self.componenttfstore = None

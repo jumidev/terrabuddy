@@ -4,6 +4,7 @@
 import os, sys
 import unittest
 from tbcore import Project, ComponentSourceGit, ComponentSourcePath, ComponentSourceException
+import tb, json
 import hcl, tempfile
 
 
@@ -42,6 +43,18 @@ class TestTbComponentSource(unittest.TestCase):
 
         assert os.path.isfile("{}/a.tf".format(p))
         assert os.path.isfile("{}/subdir/modules/b.tf".format(p))
+
+    def test_mock_component_source_gitssh_componentoverride(self):
+
+        p = tempfile.mkdtemp()
+        retcode = tb.main(["tb", "apply", "mock/mocksource/git_componentoverride", "--force", "--set-var", "test_tfstate_path={}".format(p)])
+        assert retcode == 0 # all variables substituted
+
+        with open("{}/terraform.tfstate".format(p), "r") as fh:
+            obj = json.load(fh)
+
+        assert obj["outputs"]["random_string"]["value"] != None
+
 
     def test_mock_component_source_githttp(self):
 

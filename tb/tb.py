@@ -266,6 +266,10 @@ def main(argv=[]):
 
                     project.setup_component_source()
 
+                    
+                    project.setup_component_file_overrides()
+
+
                     tfvars_hcl = hcldump(project.component_inputs)
                     with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
                         fh.write(tfvars_hcl)
