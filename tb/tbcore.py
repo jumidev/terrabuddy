@@ -1247,7 +1247,7 @@ class TfStateStoreAzureStorage(TfStateStore):
             downloader = blob_client.download_blob(max_concurrency=1, encoding='UTF-8')
             blob_text = downloader.readall()
 
-            with open(self.localpath, 'wb') as fh:
+            with open(self.localpath, 'w') as fh:
                 fh.write(blob_text)
 
             self.fetched = True
