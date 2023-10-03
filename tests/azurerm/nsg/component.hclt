@@ -1,0 +1,30 @@
+source {
+	repo = "https://github.com/jumidev/terraform-modules-azure.git"
+	path = "infra/network_security_group"
+}
+
+inputs {
+	name = "test_nsg_${run_id}"
+	security_rules = {
+		"allow_http_internet" = {
+			protocol                   = "*"       # (Required) Network protocol this rule applies to. Can be Tcp, Udp, Icmp, or * to match all.
+			destination_port_range     = "80"      # (Optional) Destination Port or Range. Integer or range between 0 and 65535 or * to match any
+			destination_address_prefix = "*"       # (Optional) CIDR or destination IP range or * to match any IP. Tags such as ‘VirtualNetwork’, ‘AzureLoadBalancer’ and ‘Internet’ can also be used
+		}
+		"allow_asg_ssh" = {
+			protocol                   = "*"       # (Required) Network protocol this rule applies to. Can be Tcp, Udp, Icmp, or * to match all.
+			destination_port_range     = "22"      # (Optional) Destination Port or Range. Integer or range between 0 and 65535 or * to match any
+			application_security_group = "test_asg_${run_id}"       # (Optional) CIDR or destination IP range or * to match any IP. Tags such as ‘VirtualNetwork’, ‘AzureLoadBalancer’ and ‘Internet’ can also be used
+		}
+	}
+}
+
+tfstate_links {
+	resource_group_name = "azurerm/resource_group_vnet"
+}
+
+tfstate_store {
+	storage_account = "${storage_account}"
+	container = "${container}"
+	container_path = "test/${run_id}/${COMPONENT_PATH}"
+}

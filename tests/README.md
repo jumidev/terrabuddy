@@ -15,6 +15,7 @@ docker run -it test-terrabuddy
 
 # TODO
 - ~~test componentsource git tag~~
+- test tfsource git tag wildcards
 - ~~test vars.yml variables~~
 - ~~test creating multiple vpc subnets using map and tfstate link~~
 - tb_setup
@@ -25,7 +26,6 @@ docker run -it test-terrabuddy
    - ~~setup tfstate encryption~~
    - setup linked project(s)
    - ~~setup multiple encryption keys~~
-- test tfstate values
 - ~~test hcl dumping -> strings, lists, maps, recursively~~
 - test fetching value(s) from tfstates
 - test azurerm

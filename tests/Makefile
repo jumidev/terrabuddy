@@ -7,10 +7,10 @@ setup:
 	source venv/bin/activate && cd ../tb && python3 setup.py install 
 
 test_azurerm: setup
-	source venv/bin/activate && python3 -m pytest azurerm_0*py
+	source venv/bin/activate && PYTHONWARNINGS=ignore python3 -m pytest azurerm_0*py
 
 test_aws: setup
-	source venv/bin/activate && python3 -m pytest aws_0*py
+	source venv/bin/activate && PYTHONWARNINGS=ignore python3 -m pytest aws_0*py
 
 test_aws_last: setup
 	source venv/bin/activate && python3 -m pytest aws_005*py

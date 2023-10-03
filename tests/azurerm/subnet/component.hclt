@@ -1,15 +1,17 @@
 source {
 	repo = "https://github.com/jumidev/terraform-modules-azure.git"
-	path = "network/virtual_network"
+	path = "network/subnet"
 }
 
 inputs {
-	name = "example_virtual_network_${run_id}"
-	address_spaces = ["192.168.0.0/16"]
+	name = "test_subnet_${run_id}"
+	address_prefixes = ["192.168.1.0/24"]
 }
 
 tfstate_links {
 	resource_group_name = "azurerm/resource_group_vnet"
+	virtual_network_name = "azurerm/virtual_network"
+	network_security_group_id = "azurerm/nsg"
 }
 
 tfstate_store {

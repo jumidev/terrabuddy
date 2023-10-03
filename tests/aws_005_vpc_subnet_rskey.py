@@ -74,6 +74,10 @@ class TestTbAwsVpcSubnet(unittest.TestCase):
         retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
         assert retcode == 0
 
+        # second apply, should also succeed with no changes
+        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
+        assert retcode == 0
+
     def test_apply_delete_subnet_failmode_not_a_component(self):
         cdir = "aws/subnet_tfstate_fail"
         try:

@@ -83,6 +83,10 @@ class TestTbAwsPlanVpc(unittest.TestCase):
 
         assert rs["outputs"]["name"]["value"] == "example vpc {}".format(self.run_string)
 
+        # apply again, should return 0
+        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        assert retcode == 0
+
         # now destroy
         retcode = tb.main(["tb", "destroy", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
