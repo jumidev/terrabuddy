@@ -46,6 +46,118 @@ class ProjectSetup():
             title='Confirm',
             text='You sure you want to quit new project setup?.').run()
 
+    def add_project_link_tui(self):
+        n = ""
+        proposed_link_name = ""
+        while len(n) == 0:
+            n = input_dialog(
+            title='Link a Project',
+            default=n,
+            text='Project filepath or git repo to link to:').run()
+            if n == None:
+                return None, None
+
+        link_d = {}
+        if n.startswith('https://') or n.startswith("git"):
+            branch = input_dialog(
+            title='Git branch',
+            default="",
+            text='Use a specific branch or tag in {}?\nLeave blank for default branch'.format(n)).run()                                
+
+            if branch == None:
+                return None, None
+
+            repo_path = input_dialog(
+            title='Git path',
+            default="",
+            text='Use a specific path within the repo? Leave blank for root path').run()
+
+            if repo_path == None:
+                return None, None
+
+            proposed_link_name = n.split("/")[-1].replace(".git", "")
+            link_d["repo"] = n
+            if len(branch) > 0:
+                link_d["branch"] = branch
+
+            if len(repo_path) > 0:
+                link_d["path"] = repo_path
+
+        else:
+            link_d["path"] = n
+
+        link_name = ""
+        while len(link_name) < 5:
+
+            link_name = input_dialog(
+            title='Link name',
+            default=proposed_link_name,
+            text='Name for this project link:').run()
+
+            if link_name == None:
+                return None, None
+
+        ans = yes_no_dialog(
+        title='Ready',
+        text='Add the following link to project?\n {}'.format(yaml.dump({link_name: link_d}))).run()
+
+        if not ans:
+            return None, None
+        
+        return link_name, link_d
+
+
+    def linkstui(self):
+        # if dir is NOT already project, fail
+        if not self.project_already_setup:
+            ok = message_dialog(
+            title='Error',
+            text='Directory not setup as a project.').run()
+            return
+        existing_project = self.read_project()
+        if "project_links" not in existing_project:
+            existing_project["project_links"] = {}
+            ans = yes_no_dialog(
+            title='Ready',
+            text='Project links allow you to reference other projects in your component tfstate_link blocks.  Proceed?').run()
+            
+            if not ans:
+                time.sleep(0.3)
+                return
+
+            return
+        else:
+
+            link_info = ""
+
+            for k,v in existing_project["project_links"].items():
+                try:
+                    target = v["repo"]
+                except:
+                    target = v["path"]
+
+                link_info += "\nLink: {} -> {}".format(k, target)
+                link_info += "\nUsage in tfstate_links: <some_input>: {}:path/to/component:<some_key>".format(k)
+                link_info += "\n"
+
+            ans = button_dialog(
+            title='Project links',
+            buttons=[("Great", False), ("Add New", True)],
+            text='{} Link(s) already configured for project:\n {}'.format(len(existing_project["project_links"].keys()), link_info)).run()
+            
+            if not ans:
+                return
+            
+        (link_name, d) = self.add_project_link_tui()
+
+        if link_name == None:
+            return
+        
+        existing_project["project_links"][link_name] = d
+        
+        with open(self.yml_file, 'w') as fh:
+            fh.write(yaml.dump(existing_project))
+
     def tui(self):
         # if dir is already project, fail
         # ask for project name
@@ -618,6 +730,7 @@ def main(argv=[]):
                     menuvalues.insert(0,("tfstore_setup_encryption", "Setup/check tfstate storage encryption"))
 
                 menuvalues.insert(0,("tfstore_setup", "Setup/check tfstate storage"))
+            menuvalues.insert(0,("links", "Setup/check project links"))
             menuvalues.insert(0,("creds", "Setup/check cloud credentials"))
 
         else:
@@ -632,6 +745,9 @@ def main(argv=[]):
         ).run()
 
         u = Utils()
+
+        if result == 'links':
+            proj.linkstui()
 
         if result == 'new_project':
 
