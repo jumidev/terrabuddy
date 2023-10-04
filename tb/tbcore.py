@@ -333,7 +333,7 @@ def git_check(wdir='.'):
                     sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(TB_GIT_DEFAULT_BRANCH, branch))
                     sys.stderr.write("\n")
                     
-                answer = raw_input("Do you want to continue anyway? [y/N]? ").lower()
+                answer = input("Do you want to continue anyway? [y/N]? ").lower()
                 
                 if answer != 'y':
                     log("")

@@ -295,7 +295,7 @@ class SetupTfStateStorage(ProjectSetup):
                 obj = hcl.load(fp)
                 return obj
             except:
-                raise HclParseException("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(path))
+                raise HclParseException("FATAL: An error occurred while parsing {}\nPlease verify that this file is valid hcl syntax".format(self.tfstate_file))
 
     def existing_tfstate_store_setup(self):
         try:
