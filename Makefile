@@ -14,3 +14,9 @@ test_aws_last:
 
 install:
 	cd tb && make install
+
+build_test_docker:
+	docker build . -f Dockerfile-tests -t test-terrabuddy
+	
+test_docker: build_test_docker
+	docker run -it test-terrabuddy

@@ -1,0 +1,4 @@
+run_id: ${run_id}
+storage_account: ${TEST_AZURE_STORAGE_ACCOUNT}
+container: ${TEST_AZURE_STORAGE_CONTAINER}
+fail_rule_priority: ${fail_rule_priority}

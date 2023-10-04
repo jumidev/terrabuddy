@@ -68,6 +68,9 @@ def hcldumplines(obj, recursions=0):
         if recursions > 0:
             yield " "*recursions+'{\n'
         for k,v in obj.items():
+            if type(k) != str:
+                raise HclDumpException("dictionary keys can only contain letters, numbers and underscores")
+
             matches = re.findall(HCL_KEY_RE, k)
             if len(matches) == 0:
                 raise HclDumpException("dictionary keys can only contain letters, numbers and underscores")

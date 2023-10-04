@@ -1,0 +1,35 @@
+source {
+	repo = "https://github.com/jumidev/terraform-modules-azure.git"
+	path = "infra/network_security_group"
+}
+
+inputs {
+	name = "test_nsg_${run_id}"
+	security_rules = {
+		"allow_http_internet" = {
+			destination_port_range     = "80"    
+			destination_address_prefix = "*"     
+		}
+		"allow_https_internet" = {
+			priority = "300"
+			destination_port_range     = "443"  
+			destination_address_prefix = "*"     
+		}
+		"allow_https_internet_fail" = {
+			priority = "${fail_rule_priority}"
+			destination_port_range     = "443" 
+			destination_address_prefix = "*"  
+		}
+
+	}
+}
+
+tfstate_links {
+	resource_group_name = "azurerm/resource_group_vnet"
+}
+
+tfstate_store {
+	storage_account = "${storage_account}"
+	container = "${container}"
+	container_path = "test/${run_id}/${COMPONENT_PATH}"
+}
