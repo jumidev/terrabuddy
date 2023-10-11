@@ -20,8 +20,7 @@ class TestTbAwsVpc(unittest.TestCase):
         project = Project(git_filtered=False)
         project.set_component_dir("aws/vpc")
         project.set_tf_dir(p)
-        project.parse_template()
-        project.save_outfile()
+        project.save_parsed_component()
         assert os.path.isfile("{}/component.hcl".format(p))
 
         obj = hcl.loads(project.hclfile)

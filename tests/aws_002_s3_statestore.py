@@ -36,7 +36,7 @@ class TestTbAwsS3StateStore(unittest.TestCase):
         project = Project(git_filtered=False)
         cdir = "aws/vpc"
         project.set_component_dir(cdir)
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
 
         obj["tfstate_store"] = {

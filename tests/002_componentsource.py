@@ -20,7 +20,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/filepath")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         cs = ComponentSourcePath(args=obj["source"])
@@ -34,7 +34,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/git")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         cs = ComponentSourceGit(args=obj["source"])
@@ -60,7 +60,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         cs = ComponentSourceGit(args=obj["source"])
@@ -74,7 +74,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         obj["source"]["branch"] = "test_branch"
@@ -90,7 +90,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         obj["source"]["branch"] = "fail branch"
@@ -107,7 +107,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         obj["source"]["path"] = "fail path"
@@ -124,7 +124,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         obj["source"]["tag"] = "test_tag"
@@ -137,7 +137,7 @@ class TestTbComponentSource(unittest.TestCase):
 
         project = Project(git_filtered=False)
         project.set_component_dir("mock/mocksource/githttp")
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
         p = tempfile.mkdtemp()
         obj["source"]["tag"] = "WRONG_TAG"

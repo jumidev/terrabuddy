@@ -13,6 +13,6 @@ tfstate_store {
 	bucket_path = "test/${run_id}/${COMPONENT_PATH}"
 }
 
-tfstate_links {
+tfstate_inputs {
 	vpc_id = "${tfstate_link}"
 }

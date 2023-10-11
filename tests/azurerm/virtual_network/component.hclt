@@ -8,7 +8,7 @@ inputs {
 	address_spaces = ["192.168.0.0/16"]
 }
 
-tfstate_links {
+tfstate_inputs {
 	resource_group_name = "azurerm/resource_group_vnet"
 }
 

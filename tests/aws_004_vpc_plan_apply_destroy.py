@@ -68,7 +68,7 @@ class TestTbAwsPlanVpc(unittest.TestCase):
         # check that remote state is present on s3
         project = Project(git_filtered=False, project_vars={'run_id': self.run_string})
         project.set_component_dir(cdir)
-        project.parse_template()
+        project.parse_component()
         obj = hcl.loads(project.hclfile)
 
         crs = TfStateStoreAwsS3(args=obj["tfstate_store"], localpath=tfstate_file)

@@ -32,8 +32,8 @@ docker run -it test-terrabuddy
 - test azurerm
    - ~~rg and tfstate~~
 - test aws bundle
-- test list type tfstate_links
-- test tfstate_links in linked projects
+- test list type tfstate_inputs
+- test tfstate_inputs in linked projects
 - clean azure storage tests, delete all tfstates older than x days
 - test tb showvars
 - test aws sts auth

@@ -3,6 +3,9 @@ SHELL := /bin/bash
 test:
 	cd tests && make test
 
+test_last:
+	cd tests && make test_last
+
 test_aws:
 	cd tests && make test_aws
 

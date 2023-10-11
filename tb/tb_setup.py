@@ -137,7 +137,7 @@ class ProjectSetup():
                     target = v["path"]
 
                 link_info += "\nLink: {} -> {}".format(k, target)
-                link_info += "\nUsage in tfstate_links: <some_input>: {}:path/to/component:<some_key>".format(k)
+                link_info += "\nUsage in tfstate_inputs: <some_input>: {}:path/to/component:<some_key>".format(k)
                 link_info += "\n"
 
             ans = button_dialog(
@@ -762,8 +762,7 @@ def main(argv=[]):
                     ok = message_dialog(
                     title='Success',
                     text='terraform {} successfully installed.'.format(u.terraform_currentversion()[0])).run()
-                    continue
-                if result in outdated:
+                elif result in outdated:
                     ans = yes_no_dialog(
                     title='{} is out of date'.format(result),
                     text='upgrade to latest version?').run()
@@ -773,6 +772,31 @@ def main(argv=[]):
                     ok = message_dialog(
                     title='Nothing to do',
                     text='terraform {} is already installed in {} and is the latest version.'.format(u.terraform_currentversion()[0], u.terraform_path)).run()
+
+
+                terraformrc = os.path.expanduser('~/.terraformrc')
+                plugin_cache = False
+
+                lines = []
+
+                if os.path.isfile(terraformrc):
+                    with open(terraformrc, 'r') as fh:
+                        for line in fh.readlines():
+                            lines.append(line)
+                            if "plugin_cache_dir = " in line:
+                                plugin_cache = True
+
+                if not plugin_cache:
+                    ans = yes_no_dialog(
+                    title='No terraform plugin cache'.format(result),
+                    text='No terraform plugin cache found in ~/.terraformrc.  Caching terraform plugins locally saves bandwidth and reduces init time.  Enable caching?').run()
+                    if ans:
+                        lines.append('plugin_cache_dir = "$HOME/.terraform.d/plugin-cache"')
+                        
+                        with open(terraformrc, "w") as fh:  
+                            for l in lines:
+                                fh.write(l)
+
             except Exception as e:
                 ok = message_dialog(
                 title='Error',

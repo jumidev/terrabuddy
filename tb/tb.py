@@ -9,7 +9,7 @@ import hashlib
 from pathlib import Path
 import time
 import tbcore
-from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, get_project_root, hcldump
+from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, hcldump, get_tg_cachedir
 from tbcore import Utils, Project, WrapTerraform, TfStateReader
 from tbcore import ComponentSourceGit, ComponentSourcePath
 from tbcore import TfStateStoreAwsS3, TfStateStoreAzureStorage, TfStateStoreFilesystem
@@ -63,10 +63,7 @@ def main(argv=[]):
     parser.add_argument('--setup', action='store_true', help='Install terraform')
     parser.add_argument('--check-setup', action='store_true', help='Check if terraform is up to date')
     parser.add_argument('--setup-shell', action='store_true', help='Export a list of handy aliases to the shell.  Can be added to ~./bashrc')
-    parser.add_argument('--setup-terraformrc', action='store_true', help='Setup sane terraformrc defaults')
     parser.add_argument('--debug', action='store_true', help='display debug messages')
-
-    clear_cache = False
 
     args = parser.parse_args(args=argv)
 
@@ -92,7 +89,7 @@ def main(argv=[]):
     )
     u.setup(args)
 
-    if args.setup_shell or args.setup_terraformrc or args.check_setup  or args.setup:
+    if args.setup_shell or args.check_setup  or args.setup:
         return 0
 
     # grab args
@@ -116,6 +113,7 @@ def main(argv=[]):
 
     project = Project(git_filtered=git_filtered, project_vars=project_vars)
     wt = WrapTerraform(terraform_path=u.terraform_path)
+    project.set_passphrases(tfstate_store_encryption_passphrases)
 
     if args.downstream_args != None:
         wt.set_option(args.downstream_args)
@@ -183,29 +181,14 @@ def main(argv=[]):
         
         project.set_component_dir(cdir)
 
-        #here we make tf working dir
         tf_wdir = os.getenv("TG_WORKING_DIR", None)
 
         if tf_wdir == None:
-            current_date_slug = datetime.date.today().strftime('%Y-%m-%d')
+            project_abspath = os.path.abspath(project.get_project_root())
+            cdir_slug = cdir.replace('/', '_')
+            tf_wdir_p = get_tg_cachedir(project_abspath+cdir_slug)
 
-            project_abspath = os.path.abspath(get_project_root(cdir, project.conf_marker))
-            project_slug = hashlib.sha224(project_abspath.encode('utf-8')).hexdigest()
-            cdir_relproject = os.path.abspath(os.getcwd())[len(project_abspath)+1:]+'/'+cdir
-            cdir_slug = cdir_relproject.replace('/', '_')
-
-            tf_wdir_root = os.path.expanduser('~/.cache/terrabuddy/')
-            tf_wdir_p = '{}/{}/{}'.format(tf_wdir_root, project_slug, current_date_slug)
-
-            tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug,  str(time.time()))
-
-            if not os.path.isdir(tf_wdir_p):
-                # first time today tb has been run, clean up past cache
-                delfiles(tf_wdir_root, 30)
-
-            if os.path.isdir(tf_wdir):
-                shutil.rmtree(tf_wdir)
-
+            tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
             os.makedirs(tf_wdir)
 
         debug("setting tf_wdir to {}".format(tf_wdir))
@@ -223,11 +206,7 @@ def main(argv=[]):
 
         t = project.component_type(component=cdir)
         if t == "component":
-            project.parse_template()
-            project.set_passphrases(tfstate_store_encryption_passphrases)
-
-            project.setup_component_tfstore()
-            project.save_outfile()
+            project.save_parsed_component()
 
             if command == "showvars":
                 if args.json:
@@ -312,8 +291,8 @@ def main(argv=[]):
             components = project.get_bundle(cdir)
             for component in components:
                 project.set_component_dir(component)
-                project.parse_template()
-                project.save_outfile()
+                project.parse_component()
+                project.save_parsed_component()
                 if project.parse_status != True:
 
                     parse_status.append(project.parse_status)

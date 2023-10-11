@@ -4,8 +4,6 @@
 
 import setuptools
 from setuptools import setup
-#import tbcore, tb
-
 
 with open("../README.md", "r") as fh:
     long_description = fh.read()
