@@ -1,0 +1,12 @@
+source = null
+
+inputs {}
+
+tfstate_store {
+    path = "${tfstate_store_path_b}"
+}
+
+tfstate_inputs {
+    a1_foo = "a:component_a1"
+    a1_random_string = "a:component_a1:random_string"
+}

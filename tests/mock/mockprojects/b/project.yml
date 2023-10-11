@@ -1,0 +1,4 @@
+project_name: "mockproject_b"
+project_links:
+    a:
+      path: "${project_a_path}"

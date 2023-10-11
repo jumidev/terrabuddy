@@ -407,9 +407,11 @@ class Project():
         conf_marker="project.yml",
         inpattern=".hclt",
         project_vars={},
-        wdir=os.getcwd()
+        wdir=None
         ):
 
+        if wdir == None:
+            wdir = os.getcwd()
         self.wdir = wdir
         self.inpattern=inpattern
         self.component_dir=None
@@ -425,21 +427,9 @@ class Project():
         self.passphrases = []
         self.project_vars = project_vars
 
-    def get_project_root(self, dir=None, fallback_to_git=True):
-        if dir == None:
-            dir = self.wdir
-        d = os.path.abspath(dir)
-
-        if os.path.isfile("{}/{}".format(d, self.conf_marker)):
-            return dir
-        if fallback_to_git and dir_is_git_repo(dir):
-            return dir
-        
-        oneup = os.path.abspath(dir+'/../')
-        if oneup != "/":
-            return self.get_project_root(oneup, fallback_to_git)
-        
-        raise Exception("Could not find a project root directory")
+    @property
+    def project_root(self):
+        return os.path.abspath(self.wdir)
 
     def set_passphrases(self, passphrases=[]):
         self.passphrases = passphrases
@@ -529,8 +519,9 @@ class Project():
                     if len(p) > 3:
                         filtered.append(os.path.dirname(p))
 
-            for (dirpath, filename) in flatwalk('.'):
-                dirpath = dirpath[2:]
+            d = self.project_root
+            for (dirpath, filename) in flatwalk(d):
+                dirpath = dirpath[len(d)+1:]
                 if filename in ['component.hclt', "bundle.yml"] and len(dirpath) > 0:
                     which = "component"
                     if filename == "bundle.yml":
@@ -597,17 +588,37 @@ class Project():
             self.check_hclt_file(f)
 
     def get_files(self):
-        project_root = self.get_project_root(self.component_dir)
-        for (folder, fn) in flatwalk_up(project_root, self.component_dir):
+        #project_root = self.get_project_root(self.component_dir)
+        for (folder, fn) in flatwalk_up(self.project_root, self.component_dir):
             if fn.endswith(self.inpattern):
                 yield "{}/{}".format(folder, fn)
 
+    def parse_items(self, trynum=0):
+        # parse item values
+        for k,v in self.vars.items():
+            self.vars[k] = self.parse(v)
+
+        problems = []
+
+        for k,v in self.vars.items():
+            if "${" in  v:
+                msg = self.check_parsed_text(v)
+                if msg != "":
+                    problems.append("File {}, cannot parse value of \"{}\"".format(os.path.relpath(self.var_sources[k]), k))
+                    for line in msg.split("\n"):
+                        problems.append(line)
+
+        if len(problems) > 0 and trynum < 5:
+            return self.parse_items(trynum+1)
+
+        return problems
+
     def get_yml_vars(self):
         if self.vars == None:
-            var_sources = {}
-            project_root = self.get_project_root(self.component_dir)
+            self.var_sources = {}
+            #project_root = self.get_project_root(self.component_dir)
             self.vars={}
-            for (folder, fn) in flatwalk_up(project_root, self.component_dir):
+            for (folder, fn) in flatwalk_up(self.project_root, self.component_dir):
                 if fn.endswith('.yml'):
 
                     with open(r'{}/{}'.format(folder, fn)) as fh:
@@ -616,10 +627,10 @@ class Project():
                             for k,v in d.items():
                                 if type(v) in (str, int, float, dict):
                                     self.vars[k] = v
-                                    var_sources[k] =  '{}/{}'.format(folder, fn)
+                                    self.var_sources[k] =  '{}/{}'.format(folder, fn)
 
             # special vars
-            self.vars["PROJECT_ROOT"] = project_root
+            self.vars["PROJECT_ROOT"] = self.project_root
             self.vars["COMPONENT_PATH"] = self.component_path
             self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
             try:
@@ -627,20 +638,7 @@ class Project():
             except OSError:
                 self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(__file__))
 
-            # parse item values
-            for i in range(10):
-                for k,v in self.vars.items():
-                    self.vars[k] = self.parse(v)
-
-            problems = []
-
-            for k,v in self.vars.items():
-                if "${" in  v:
-                    msg = self.check_parsed_text(v)
-                    if msg != "":
-                        problems.append("File {}, cannot parse value of \"{}\"".format(os.path.relpath(var_sources[k]), k))
-                        for line in msg.split("\n"):
-                            problems.append(line)
+            problems = self.parse_items()
 
             if len(problems) > 0:
 
@@ -650,17 +648,6 @@ class Project():
                 sys.stderr.write("\n")
                 sys.stderr.write("\n")
                 raise ErrorParsingYmlVars(" ".join(problems))
-
-            # now for every value that starts with rspath(...), parse
-            # for k,v in self.vars.items():
-            #     if v.startswith("rspath(") and v.endswith(")"):
-            #         txt = self.parsetext(v[7:-1])
-            #         (component, key) = txt.split(":")
-            #         if self.remotestates == None:
-            #             self.remotestates = RemoteStateReader()
-            #         self.vars[k] = self.remotestates.value(component, key)
-
-
 
     def set_component_instance(self):
         if self.component == None:
@@ -677,13 +664,14 @@ class Project():
         self.componentsource = self.component.get_source_instance()
 
     def setup_component_file_overrides(self):
-        for (d, fn) in flatwalk(self.component_dir):
+        base = os.path.join(self.project_root, self.component_dir)
+        for (d, fn) in flatwalk(base):
             if fn.endswith(".hclt"):
                 continue
             if fn.endswith(".hcl"):
                 continue
 
-            dest = self.tf_dir + '/' + d[len(self.component_dir):]
+            dest = os.path.join(self.tf_dir, d[len(base):])
             
             if not os.path.isdir(dest):
                 os.makedirs(dest)
@@ -715,38 +703,38 @@ class Project():
             # touch tfstate
             Path(tfstate_file).touch()
 
-    def get_linked_project_source_instance(self, linked_project_name):
+    def get_linked_project(self, linked_project_name):
         if self.get_linked_projects():
             if linked_project_name not in self.linked_projects:
                 raise NoSuchLinkedProjectException("'{}': No such linked project".format(linked_project_name))
                 
-            source = self.linked_projects[linked_project_name]
+            if "source_instance" not in self.linked_projects[linked_project_name]:
+                source = self.linked_projects[linked_project_name]
 
-            p = Project(git_filtered=False)
-            self.linked_projects[linked_project_name]["project_instance"] = p
+                if "repo" in source:
+                    i = LinkedProjectSourceGit(args=source)
+                    targetdir = get_tg_cachedir(source["repo"]+linked_project_name)
 
-            if "repo" in source:
-                i = LinkedProjectSourceGit(args=source)
-                targetdir = get_tg_cachedir(source["repo"]+linked_project_name)
+                elif "path" in source:
+                    i = LinkedProjectSourcePath(args=source)
+                    targetdir = get_tg_cachedir(source["path"]+linked_project_name)
 
-            elif "path" in source:
-                i = LinkedProjectSourcePath(args=source)
-                targetdir = get_tg_cachedir(source["path"]+linked_project_name)
+                else:
+                    raise ProjectException("No handler for LinkedProjectSource")
 
-            else:
-                raise ProjectException("No handler for LinkedProjectSource")
+                self.linked_projects[linked_project_name]["source_instance"] = i
 
-            self.linked_projects[linked_project_name]["source_instance"] = i
+                # fetch into a dir
+                p = Project(git_filtered=False, wdir=targetdir, project_vars=self.project_vars)
+                tfdir = get_tg_cachedir(source["path"]+"tfdir")
+                p.set_tf_dir(tfdir)
 
-            # fetch into a dir
-            p.wdir = targetdir
 
-            i.set_targetdir( targetdir)
-            i.fetch()
+                self.linked_projects[linked_project_name]["project_instance"] = p
+                i.set_targetdir(targetdir)
+                i.fetch()
 
-            #p.
-
-        return self.linked_projects[linked_project_name]
+            return self.linked_projects[linked_project_name]
 
     # def get_linked_project_source_instance(self, name):   
     #         return self.linked_projects[name]["source_instance"]
@@ -778,8 +766,13 @@ class Project():
             for k,v in obj["tfstate_inputs"].items():
 
                 from_lp = False
+                which = None
+                if "_" in k:
+                    which = k.split("_")[-1]
+
                 if lp:
                     parts = v.split(":")
+                    cdir = parts[1]
 
                     if len(parts) == 3:
                         # definitely a linked project
@@ -792,17 +785,25 @@ class Project():
                             lp_name = parts[0]
 
                 if from_lp:
-                    si = self.get_linked_project_source_instance(lp_name)
+                    si = self.get_linked_project(lp_name)
+
                     p = si["project_instance"]
+                    p.set_component_dir(cdir)
+                    t = p.component_type(component=cdir)
+                    p.save_parsed_component()
+                
+                    if t != "component":                   
+                        raise ComponentException(tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir, which)
+                    tfstate_file = "{}/terraform.tfstate".format(p.tf_dir)
 
                 else:
+                    d = tempfile.mkdtemp()
+                    tfstate_file = "{}/terraform.tfstate".format(d)
+
                     project = deepcopy(self)
                     project.git_filtered = False
                     project.components = None # reset component cache
 
-                    which = None
-                    if "_" in k:
-                        which = k.split("_")[-1]
                     if ":" in v:
                         which = v.split(":")[-1]
                         v = v.split(":")[0]
@@ -813,20 +814,20 @@ class Project():
                     if t != "component":
                         raise ComponentException("tfstate_inputs key '{}', value '{}' must point to a component".format(k, v))
 
-                    d = tempfile.mkdtemp()
-                    tfstate_file = "{}/terraform.tfstate".format(d)
                     project.set_tf_dir(d)
                     project.save_parsed_component()
 
-                    with open(tfstate_file, 'r') as fh:
-                        tfstate = json.load(fh)
+                with open(tfstate_file, 'r') as fh:
+                    tfstate = json.load(fh)
 
-                    try:
+                try:
 
-                        val = tfstate["outputs"][which]["value"]
-                        inputs[k] = val
-                    except KeyError:
-                        raise ComponentException("tfstate_inputs {} No such output in component {}".format(which, v))
+                    val = tfstate["outputs"][which]["value"]
+                    inputs[k] = val
+                except KeyError:
+                    raise ComponentException(which, tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir)
+
+                    raise ComponentException("tfstate_inputs {} No such output in component {}".format(which, v))
 
         for k in cloud_cred_keys():
             if k in os.environ:
@@ -847,7 +848,7 @@ class Project():
     @property
     def component_path(self):
         abswdir = os.path.abspath(self.component_dir)
-        absroot =self.get_project_root(self.component_dir)
+        absroot =self.project_root
 
         return abswdir[len(absroot)+1:]
 
@@ -870,30 +871,6 @@ class Project():
                     "filename": f,
                     "data" : data
                 }
-
-    # @property
-    # def tfvars_env(self):
-    #     self.get_yml_vars()
-    #     en = {}
-
-    #     # self.vars
-    #     for (k, v) in  self.vars.items():
-    #         en['TF_VAR_{}'.format(k)] = v
-
-    #     # ENV VARS
-    #     for (k, v) in  os.environ.items():
-    #         en['TF_VAR_{}'.format(k)] = v
-
-    #     return en
-
-    # @property
-    # def tfvars_tf(self):
-    #     out = []
-    #     for (k,v) in self.tfvars_env.items():
-    #         s = "variable \"{}\" ".format(k[7:]) + '{default = ""}'
-    #         out.append(s)
-
-    #     return "\n".join(out)
 
     def parse(self, obj):
         if type(obj) == str:

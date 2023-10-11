@@ -1,19 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import json, os, sys,  hcl, shutil, time
+import json, os, sys
 import argparse
 from pyfiglet import Figlet
-import datetime
-import hashlib
-from pathlib import Path
-import time
 import tbcore
 from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, hcldump, get_tg_cachedir
 from tbcore import Utils, Project, WrapTerraform, TfStateReader
-from tbcore import ComponentSourceGit, ComponentSourcePath
-from tbcore import TfStateStoreAwsS3, TfStateStoreAzureStorage, TfStateStoreFilesystem
-
 
 PACKAGE = "tb"
 LOG = True
@@ -45,6 +38,7 @@ def main(argv=[]):
     # subtle bug in ArgumentParser... nargs='?' doesn't work if you parse something other than sys.argv,
     parser.add_argument('command', default=None, nargs='*', help='command to run (apply, destroy, plan, etc)')
 
+    parser.add_argument('--project-dir', default=None, help='optional project root dir')
     parser.add_argument('--downstream-args', default=None, help='optional arguments to pass downstream to terraform')
     parser.add_argument('--key', default=None, help='optional remote state key to return')
     parser.add_argument('--set-var', action='append', nargs='+', help='optional variable to override (usage: --set-var KEY=VALUE)')
@@ -111,7 +105,7 @@ def main(argv=[]):
             k,v = set_var[0].split("=", 1)
             project_vars[k] = v
 
-    project = Project(git_filtered=git_filtered, project_vars=project_vars)
+    project = Project(git_filtered=git_filtered, project_vars=project_vars, wdir=args.project_dir)
     wt = WrapTerraform(terraform_path=u.terraform_path)
     project.set_passphrases(tfstate_store_encryption_passphrases)
 
@@ -169,13 +163,13 @@ def main(argv=[]):
     if command in ("plan", "apply", "destroy", "refresh", "show", "force-unlock", "parse", "showvars"):
 
         try:
-            cdir = os.path.relpath(args.command[2])
+            cdir = args.command[2]
         except:
             log("OOPS, no component specified, try one of these (bundles are <u><b>bold underlined</b>):")
             project.example_commands(command)
             return(100)
 
-        if not os.path.isdir(cdir):
+        if not os.path.isdir(os.path.join(project.wdir, cdir)):
             log("ERROR: {} is not a directory".format(cdir))
             return -1
         
@@ -184,9 +178,8 @@ def main(argv=[]):
         tf_wdir = os.getenv("TG_WORKING_DIR", None)
 
         if tf_wdir == None:
-            project_abspath = os.path.abspath(project.get_project_root())
             cdir_slug = cdir.replace('/', '_')
-            tf_wdir_p = get_tg_cachedir(project_abspath+cdir_slug)
+            tf_wdir_p = get_tg_cachedir(project.project_root+cdir_slug)
 
             tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
             os.makedirs(tf_wdir)
@@ -244,10 +237,7 @@ def main(argv=[]):
                 if not args.dry:
 
                     project.setup_component_source()
-
-                    
                     project.setup_component_file_overrides()
-
 
                     tfvars_hcl = hcldump(project.component_inputs)
                     with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
