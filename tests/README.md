@@ -33,7 +33,13 @@ docker run -it test-terrabuddy
    - ~~rg and tfstate~~
 - test aws bundle
 - test list type tfstate_inputs
-- test tfstate_inputs in linked projects
+- linked projects
+   - path
+   - git
+   - failure modes:
+      - not all vars replaced
+      - no tfstate
+      - ???
 - clean azure storage tests, delete all tfstates older than x days
 - test tb showvars
 - test aws sts auth
