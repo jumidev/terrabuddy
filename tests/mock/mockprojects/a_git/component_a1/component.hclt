@@ -1,0 +1,9 @@
+source = null
+
+inputs {
+    foo = "bar"
+}
+
+tfstate_store {
+    path = "${tfstate_store_path_a}"
+}

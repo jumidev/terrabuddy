@@ -671,9 +671,10 @@ class Project():
             if fn.endswith(".hcl"):
                 continue
 
-            dest = os.path.join(self.tf_dir, d[len(base):])
+            dest = os.path.join(self.tf_dir, d[len(base)+1:])
             
             if not os.path.isdir(dest):
+                #raise Exception(dest, base, d, fn, self.tf_dir)
                 os.makedirs(dest)
 
             shutil.copy(os.path.join(d, fn), dest)
@@ -713,11 +714,13 @@ class Project():
 
                 if "repo" in source:
                     i = LinkedProjectSourceGit(args=source)
-                    targetdir = get_tg_cachedir(source["repo"]+linked_project_name)
+                    targetdir = get_tg_cachedir(json.dumps(source)+linked_project_name)
+                    tfdir = get_tg_cachedir(json.dumps(source)+"tfdir")
 
                 elif "path" in source:
                     i = LinkedProjectSourcePath(args=source)
                     targetdir = get_tg_cachedir(source["path"]+linked_project_name)
+                    tfdir = get_tg_cachedir(source["path"]+"tfdir")
 
                 else:
                     raise ProjectException("No handler for LinkedProjectSource")
@@ -726,7 +729,6 @@ class Project():
 
                 # fetch into a dir
                 p = Project(git_filtered=False, wdir=targetdir, project_vars=self.project_vars)
-                tfdir = get_tg_cachedir(source["path"]+"tfdir")
                 p.set_tf_dir(tfdir)
 
 

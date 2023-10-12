@@ -47,7 +47,8 @@ class TestTbComponentSource(unittest.TestCase):
     def test_mock_component_source_gitssh_componentoverride(self):
 
         p = tempfile.mkdtemp()
-        retcode = tb.main(["tb", "apply", "mock/mocksource/git_componentoverride", "--force", "--set-var", "test_tfstate_path={}".format(p)])
+        retcode = tb.main(["tb", "apply", "mock/mocksource/git_componentoverride", "--force", 
+                           "--set-var", "test_tfstate_path={}".format(p)])
         assert retcode == 0 # all variables substituted
 
         with open("{}/terraform.tfstate".format(p), "r") as fh:

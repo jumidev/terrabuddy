@@ -1,6 +1,0 @@
-project_name: "mockproject_c"
-project_links:
-    a:
-      path: "${project_a_path}"
-    b:
-      path: "${project_b_path}"
