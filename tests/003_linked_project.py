@@ -6,7 +6,6 @@ import unittest
 import tb, tempfile
 from tbcore import get_random_string, ComponentSourceException
 
-
 class TestTbLinkedProject(unittest.TestCase):
 
     def setUp(self):
@@ -16,8 +15,6 @@ class TestTbLinkedProject(unittest.TestCase):
         #os.chdir(self.root_dir)
 
     def tearDown(self):
-        return
-        os.chdir(self.d_orig)
         shutil.rmtree(self.root_dir)
 
     def test_mock_project_b_reads_a1_paths(self):
@@ -46,8 +43,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         #raise Exception(self.root_dir)
 
-
-    def test_mock_project_b_reads_a1_git(self):
+    def test_mock_project_b_reads_a1_git_branch_path(self):
 
         pdira = "mock/mockprojects/a_git"
         cdir = "component_a1"
@@ -59,7 +55,90 @@ class TestTbLinkedProject(unittest.TestCase):
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
         assert retcode == 0
 
-        pdir = "mock/mockprojects/c_git"
+        pdir = "mock/mockprojects/c_git_branch_path"
+        cdir = "component_c1"
+
+        b_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdir,
+                           '--set-var', 'project_a_path={}'.format(pdira), 
+                           '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
+                           '--set-var', 'test_linked_project_branch=test_linked_project_subdir',
+                           '--set-var', 'test_linked_project_path=subdir',
+                           '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
+        assert retcode == 0
+    def test_mock_project_b_reads_a1_git_branch_path_no_such_path(self):
+
+        pdira = "mock/mockprojects/a_git"
+        cdir = "component_a1"
+
+        a_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdira,
+                           '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
+        assert retcode == 0
+
+        pdir = "mock/mockprojects/c_git_branch_path"
+        cdir = "component_c1"
+
+        b_tfstore = get_random_string(10)
+
+        try:
+            retcode = tb.main(["tb", "apply", cdir, '--force', 
+                            '--project-dir', pdir,
+                            '--set-var', 'project_a_path={}'.format(pdira), 
+                            '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
+                            '--set-var', 'test_linked_project_branch=test_linked_project_subdir',
+                            '--set-var', 'test_linked_project_path=bad_dir',
+                            '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
+            assert False
+        except ComponentSourceException:
+            pass
+        except:
+            raise
+    
+
+    def test_mock_project_b_reads_a1_git_branch(self):
+
+        pdira = "mock/mockprojects/a_git"
+        cdir = "component_a1"
+
+        a_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdira,
+                           '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
+        assert retcode == 0
+
+        pdir = "mock/mockprojects/c_git_branch"
+        cdir = "component_c1"
+
+        b_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdir,
+                           '--set-var', 'project_a_path={}'.format(pdira), 
+                           '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
+                           '--set-var', 'test_linked_project_branch=test_linked_project',
+                           '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
+        assert retcode == 0
+
+    def test_mock_project_b_reads_a1_git_path_tag(self):
+
+        pdira = "mock/mockprojects/a_git_path_tag"
+        cdir = "component_a1"
+
+        a_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdira,
+                           '--set-var', 'source_tag=foo_and_random_string',
+                           '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
+        assert retcode == 0
+
+        pdir = "mock/mockprojects/c_git_branch"
         cdir = "component_c1"
 
         b_tfstore = get_random_string(10)
@@ -75,7 +154,7 @@ class TestTbLinkedProject(unittest.TestCase):
     def test_mock_project_b_reads_a1_git_no_such_branch(self):
 
         a_tfstore = get_random_string(10)
-        pdir = "mock/mockprojects/c_git"
+        pdir = "mock/mockprojects/c_git_branch"
         cdir = "component_c1"
 
         b_tfstore = get_random_string(10)

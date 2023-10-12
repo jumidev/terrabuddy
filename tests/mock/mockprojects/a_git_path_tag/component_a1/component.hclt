@@ -1,5 +1,6 @@
 source {
     repo = "git@github.com:jumidev/test_component_placeholder.git"
+    tag = "${source_tag}"
     path = "foo_and_random_string"
 }
 

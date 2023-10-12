@@ -39,7 +39,7 @@ docker run -it test-terrabuddy
    - failure modes:
       - not all vars replaced
       - no tfstate
-      - ???
+      - no such branch
 - clean azure storage tests, delete all tfstates older than x days
 - test tb showvars
 - test aws sts auth

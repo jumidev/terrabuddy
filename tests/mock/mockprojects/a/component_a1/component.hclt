@@ -1,7 +1,4 @@
-source {
-    repo = "git@github.com:jumidev/test_component_placeholder.git"
-    path = "foo_and_random_string"
-}
+source = null
 
 inputs {
     foo = "bar"

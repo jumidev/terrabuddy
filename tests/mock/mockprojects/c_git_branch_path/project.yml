@@ -1,0 +1,6 @@
+project_name: "mockproject_c"
+project_links:
+    a:
+      repo: "git@github.com:jumidev/test_component_placeholder.git"
+      branch: "${test_linked_project_branch}"
+      path: "${test_linked_project_path}"
