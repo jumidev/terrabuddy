@@ -778,6 +778,7 @@ class Project():
                         # definitely a linked project
                         from_lp = True
                         lp_name = parts[0]
+                        which = parts[2]
                     if len(parts) == 2:
                         # might be from linked project
                         if parts[0] in self.linked_projects:

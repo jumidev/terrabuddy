@@ -10,9 +10,3 @@ output "a1_random_string" {
   value = var.a1_random_string
 }
 
-
-variable "foo" {}
-
-output "foo" {
-  value = var.foo
-}
