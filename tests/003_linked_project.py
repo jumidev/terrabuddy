@@ -4,7 +4,7 @@
 import os, shutil
 import unittest
 import tb, tempfile
-from tbcore import get_random_string, ComponentSourceException
+from tbcore import get_random_string, ComponentSourceException, ComponentException
 
 class TestTbLinkedProject(unittest.TestCase):
 
@@ -41,8 +41,29 @@ class TestTbLinkedProject(unittest.TestCase):
                            '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
         assert retcode == 0
 
-        #raise Exception(self.root_dir)
+    def test_mock_project_b_reads_a1_paths_no_tfstate(self):
 
+        pdira = "mock/mockprojects/a"
+
+        a_tfstore = get_random_string(10)
+
+        pdir = "mock/mockprojects/b"
+        cdir = "component_b1"
+
+        b_tfstore = get_random_string(10)
+        try:
+            retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdir,
+                           '--set-var', 'project_a_path={}'.format(pdira), 
+                           '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)), 
+                           '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
+            assert False
+        except ComponentException as e:
+            assert "Missing terraform.tfstate file for tfstate_inputs key" in str(e)
+        except:
+            raise
+
+        #raise Exception(self.root_dir)
     def test_mock_project_b_reads_a1_git_branch_path(self):
 
         pdira = "mock/mockprojects/a_git"
@@ -94,8 +115,8 @@ class TestTbLinkedProject(unittest.TestCase):
                             '--set-var', 'test_linked_project_path=bad_dir',
                             '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
             assert False
-        except ComponentSourceException:
-            pass
+        except ComponentSourceException as e:
+            assert "No such path bad_dir in repo" in str(e)
         except:
             raise
     
@@ -166,8 +187,8 @@ class TestTbLinkedProject(unittest.TestCase):
                             '--set-var', 'test_linked_project_branch=BAD_BRANCH',
                             '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
             assert False
-        except ComponentSourceException:
-            pass
+        except ComponentSourceException as e:
+            assert "Error cloning git repo" in str(e)
         except:
             raise
 

@@ -815,10 +815,13 @@ class Project():
                     t = project.component_type(component=v)
 
                     if t != "component":
-                        raise ComponentException("tfstate_inputs key '{}', value '{}' must point to a component".format(k, v))
+                        raise ComponentException("tfstate_inputs key {} = \"{}\" must point to a component".format(k, v))
 
                     project.set_tf_dir(d)
                     project.save_parsed_component()
+
+                if not os.path.isfile(tfstate_file):
+                    raise ComponentException("Missing terraform.tfstate file for tfstate_inputs key {} = \"{}\"".format(k, v))
 
                 with open(tfstate_file, 'r') as fh:
                     tfstate = json.load(fh)
@@ -828,8 +831,7 @@ class Project():
                     val = tfstate["outputs"][which]["value"]
                     inputs[k] = val
                 except KeyError:
-                    raise ComponentException(which, tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir)
-
+                    #raise ComponentException(which, tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir)
                     raise ComponentException("tfstate_inputs {} No such output in component {}".format(which, v))
 
         for k in cloud_cred_keys():
