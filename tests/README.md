@@ -15,7 +15,7 @@ docker run -it test-terrabuddy
 
 # TODO
 - ~~test componentsource git tag~~
-- test tfsource git tag wildcards
+- ~~test tfsource git tag wildcards~~
 - ~~test vars.yml variables~~
 - ~~test creating multiple vpc subnets using map and tfstate link~~
 - tb_setup
@@ -33,6 +33,7 @@ docker run -it test-terrabuddy
    - ~~rg and tfstate~~
 - test aws bundle
 - test list type tfstate_inputs
+- test dict type tfstate_inputs
 - linked projects
    - ~~path~~
    - ~~git~~

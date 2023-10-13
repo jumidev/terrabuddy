@@ -1094,13 +1094,30 @@ class ComponentSourceGit(ComponentSource):
 
         try:
             if "tag" in self.args:
-                Repo.clone_from(self.args["repo"], t, branch=self.args["tag"], depth=1)
+                if "*" in self.args["tag"]:
+                    repo = Repo.clone_from(self.args["repo"], t)
+                    tag = self.args["tag"].replace("*", "")
+
+                    found = False
+                    tags = []
+                    for T in repo.tags:
+                        tags.append(str(T))
+                        if tag in str(T):
+                            repo.git.checkout(T)
+                            found = True
+                            break
+
+                    if not found:
+                        raise ComponentSourceException("Error cloning git repo {}, no tag matching {}, repo contains these tags: {}".format(self.args["repo"], self.args["tag"], ", ".join(tags)))
+
+                else:
+                    Repo.clone_from(self.args["repo"], t, branch=self.args["tag"], depth=1)
             elif "branch" in self.args:
                 Repo.clone_from(self.args["repo"], t, branch=self.args["branch"], depth=1)
             else:
                 Repo.clone_from(self.args["repo"], t, depth=1)
             
-        except:
+        except Exception:
             shutil.rmtree(t)
             raise ComponentSourceException("Error cloning git repo {}".format(self.args["repo"]))
         

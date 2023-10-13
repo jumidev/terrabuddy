@@ -134,6 +134,20 @@ class TestTbComponentSource(unittest.TestCase):
 
         cs.fetch()
 
+    def test_mock_component_source_githttp_tag_wildcard(self):
+
+        project = Project(git_filtered=False)
+        project.set_component_dir("mock/mocksource/githttp")
+        project.parse_component()
+        obj = hcl.loads(project.hclfile)
+        p = tempfile.mkdtemp()
+        obj["source"]["tag"] = "test_t*"
+        cs = ComponentSourceGit(args=obj["source"])
+        cs.set_targetdir(p)
+
+        cs.fetch()
+
+
     def test_mock_component_source_githttp_tag_fail(self):
 
         project = Project(git_filtered=False)
