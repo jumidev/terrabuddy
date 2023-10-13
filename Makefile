@@ -23,3 +23,8 @@ build_test_docker:
 	
 test_docker: build_test_docker
 	docker run -it test-terrabuddy
+
+publish_pypi:
+	cd tb && rm -rf dist build && \
+	python3 setup.py sdist bdist_wheel && \
+	python3 -m twine upload dist/*

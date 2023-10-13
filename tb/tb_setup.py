@@ -125,7 +125,6 @@ class ProjectSetup():
                 time.sleep(0.3)
                 return
 
-            return
         else:
 
             link_info = ""

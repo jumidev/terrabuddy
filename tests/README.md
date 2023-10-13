@@ -24,7 +24,7 @@ docker run -it test-terrabuddy
    - ~~setup azure creds~~
    - ~~setup azure tfstate store~~
    - ~~setup tfstate encryption~~
-   - setup linked project(s)
+   - ~~setup linked project(s)~~
    - ~~setup multiple encryption keys~~
 - ~~test hcl dumping -> strings, lists, maps, recursively~~
 - test fetching value(s) from tfstates
