@@ -439,6 +439,16 @@ class Project():
 
     def set_component_dir(self, dir):
         self.component_dir=dir
+
+        cdir_slug = dir.replace('/', '_')
+        tf_wdir_p = get_tg_cachedir(self.project_root+cdir_slug)
+
+        tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
+        os.makedirs(tf_wdir)
+
+        debug("setting tf_wdir to {}".format(tf_wdir))
+        self.set_tf_dir(tf_wdir)
+
         self.component = None
         self.vars = None
 
@@ -649,14 +659,17 @@ class Project():
                 sys.stderr.write("\n")
                 raise ErrorParsingYmlVars(" ".join(problems))
 
+    @property
+    def tfstate_file(self):
+        return "{}/terraform.tfstate".format(self.tf_dir)
+
     def set_component_instance(self):
         if self.component == None:
             obj = hcl.loads(self.hclfile)
-            tfstate_file = "{}/terraform.tfstate".format(self.tf_dir)
             self.component = Component(
                 args=obj,
                 dir=self.component_dir,
-                tfstate_file=tfstate_file,
+                tfstate_file=self.tfstate_file,
                 tf_dir = self.tf_dir)
 
     def setup_component_source(self):
@@ -686,8 +699,6 @@ class Project():
         self.componenttfstore = None
         obj = hcl.loads(self.hclfile)
 
-        tfstate_file = "{}/terraform.tfstate".format(self.tf_dir)
-
         if "tfstate_store" in obj:
 
             crs = self.component.get_tfstate_store_instance()
@@ -702,7 +713,7 @@ class Project():
 
         else:
             # touch tfstate
-            Path(tfstate_file).touch()
+            Path(self.tfstate_file).touch()
 
     def get_linked_project(self, linked_project_name):
         if self.get_linked_projects():
@@ -797,8 +808,7 @@ class Project():
                 
                     if t != "component":                   
                         raise ComponentException(tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir, which)
-                    tfstate_file = "{}/terraform.tfstate".format(p.tf_dir)
-
+                    tfstate_file = p.tfstate_file
                 else:
                     d = tempfile.mkdtemp()
                     tfstate_file = "{}/terraform.tfstate".format(d)
@@ -993,6 +1003,7 @@ class Component():
         self.args = args
         self.dir = dir
         self.tfstate_file = tfstate_file
+        self.outputs = None
         self.tf_dir = tf_dir
 
     def set_dir(self, dir):
@@ -1042,6 +1053,28 @@ class Component():
         crs.fetch()
         return crs
 
+    def get_outputs(self):
+        if self.outputs == None:
+
+            if not os.path.isfile(self.tfstate_file):
+                raise ComponentException("Cannot read tfstate for component, {} : no such file".format(self.tfstate_file))
+
+            with open(self.tfstate_file, 'r') as fh:
+                o = json.load(fh)
+
+            self.outputs = o["outputs"]
+
+    def get_output(self, k):
+        self.get_outputs()
+
+        if k not in self.outputs:
+            raise ComponentException("{}: No such output for component".format(k))
+
+        return self.outputs[k]["value"]
+
+    def get_output_keys(self):
+        self.get_outputs()
+        return list(self.outputs.keys())
 
 
 class ComponentSourceException(Exception):
@@ -1141,26 +1174,26 @@ class LinkedProjectSourcePath(ComponentSourcePath):
 class LinkedProjectSourceGit(ComponentSourceGit):
     pass
 
-class TfStateReader():
+# class TfStateReader():
 
-    def __init__(self):
-        self.components = {}
+#     def __init__(self):
+#         self.components = {}
 
-    def load(self, component):
-        if component not in self.components.values():
-            # implement here
-            pass
+#     def load(self, component):
+#         if component not in self.components.values():
+#             # implement here
+#             pass
   
-    def value(self, component, key):
-        self.load(component)
+#     def value(self, component, key):
+#         self.load(component)
         
-        try:
-            value = self.components[component][key]["value"]
-        except KeyError:
-            msg = "ERROR: State key \"{}\" not found in component {}\nKey must be one of: {}".format(key, component, ", ".join(self.components[component].keys()))
-            raise RemoteStateKeyNotFound(msg)
+#         try:
+#             value = self.components[component][key]["value"]
+#         except KeyError:
+#             msg = "ERROR: State key \"{}\" not found in component {}\nKey must be one of: {}".format(key, component, ", ".join(self.components[component].keys()))
+#             raise RemoteStateKeyNotFound(msg)
 
-        return value
+#         return value
 
 class TfStateStore():
 

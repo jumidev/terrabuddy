@@ -27,7 +27,7 @@ docker run -it test-terrabuddy
    - ~~setup linked project(s)~~
    - ~~setup multiple encryption keys~~
 - ~~test hcl dumping -> strings, lists, maps, recursively~~
-- test fetching value(s) from tfstates
+- ~~test fetching value(s) from tfstates~~
 - ~~test copy all files from component dir to tfdir (for ex tf overrides)~~
 - test azurerm
    - ~~rg and tfstate~~

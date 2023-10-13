@@ -6,7 +6,7 @@ import argparse
 from pyfiglet import Figlet
 import tbcore
 from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, hcldump, get_tg_cachedir
-from tbcore import Utils, Project, WrapTerraform, TfStateReader
+from tbcore import Utils, Project, WrapTerraform
 
 PACKAGE = "tb"
 LOG = True
@@ -175,17 +175,14 @@ def main(argv=[]):
         
         project.set_component_dir(cdir)
 
-        tf_wdir = os.getenv("TG_WORKING_DIR", None)
+        # cdir_slug = cdir.replace('/', '_')
+        # tf_wdir_p = get_tg_cachedir(project.project_root+cdir_slug)
 
-        if tf_wdir == None:
-            cdir_slug = cdir.replace('/', '_')
-            tf_wdir_p = get_tg_cachedir(project.project_root+cdir_slug)
+        # tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
+        # os.makedirs(tf_wdir)
 
-            tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
-            os.makedirs(tf_wdir)
-
-        debug("setting tf_wdir to {}".format(tf_wdir))
-        project.set_tf_dir(tf_wdir)
+        # debug("setting tf_wdir to {}".format(tf_wdir))
+        # project.set_tf_dir(tf_wdir)
 
         # -auto-approve and refresh|plan do not mix
         if command in ["refresh", "plan"]:
@@ -226,8 +223,9 @@ def main(argv=[]):
                 return 110
 
             if args.key != None:
-                rs = TfStateReader()
-                print(rs.value(cdir, args.key))
+                project.setup_component_tfstore()
+                #rs = TfStateReader()
+                print(project.component.get_output(args.key))
                 return 0
             else:
                 if args.json:
@@ -235,27 +233,27 @@ def main(argv=[]):
                     wt.set_option('-no-color')
 
                 if not args.dry:
-
                     project.setup_component_source()
+
                     project.setup_component_file_overrides()
 
                     tfvars_hcl = hcldump(project.component_inputs)
-                    with open("{}/terraform.tfvars".format(tf_wdir), "w") as fh:
+                    with open("{}/terraform.tfvars".format(project.tf_dir), "w") as fh:
                         fh.write(tfvars_hcl)
 
                     # terraform init
                     cmd =  "{} init ".format(wt.tf_bin)
                     
-                    exitcode = runshow(cmd, cwd=tf_wdir)
+                    exitcode = runshow(cmd, cwd=project.tf_dir)
                     if exitcode != 0:
-                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
+                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(project.tf_dir, cmd))
                                         
                     # requested command
                     extra_args = ['-state=terraform.tfstate']
 
                     cmd = wt.get_command(command, extra_args)
 
-                    exitcode = runshow(cmd, cwd=tf_wdir)
+                    exitcode = runshow(cmd, cwd=project.tf_dir)
                     
                     # our work is done here
                     if command in ["refresh", "plan"]:
@@ -269,7 +267,7 @@ def main(argv=[]):
                     # save tfstate
                     crs.push()
                     if exitcode != 0:
-                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(tf_wdir, cmd))
+                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(project.tf_dir, cmd))
 
                     return 0
 
