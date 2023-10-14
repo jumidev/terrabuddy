@@ -42,7 +42,11 @@ docker run -it test-terrabuddy
       - ~~no tfstate~~
       - ~~no such branch~~
 - clean azure storage tests, delete all tfstates older than x days
+- add exitcodes in custom exceptions intbcore, catch them in tb
 - test tb showvars
+- test tb --key
+- tb support all arguments in env var format
+- test tb shell
 - test aws sts auth
 - test azure auth
 - test various env vars options

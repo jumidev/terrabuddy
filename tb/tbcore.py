@@ -1133,8 +1133,12 @@ class ComponentSourceGit(ComponentSource):
 
                     found = False
                     tags = []
+
                     for T in repo.tags:
                         tags.append(str(T))
+
+                    tags.sort(reverse=True)
+                    for T in tags:
                         if tag in str(T):
                             repo.git.checkout(T)
                             found = True
