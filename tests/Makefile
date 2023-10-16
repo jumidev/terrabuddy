@@ -9,6 +9,13 @@ setup:
 test_azurerm: setup
 	source venv/bin/activate && PYTHONWARNINGS=ignore python3 -m pytest azurerm_0*py
 
+azurerm_delete_test_tfstate:
+	az storage blob delete-batch  \
+	--source $(TEST_AZURE_STORAGE_CONTAINER) \
+	--account-name $(TEST_AZURE_STORAGE_ACCOUNT) \
+	--account-key `az storage account keys list --account-name $(TEST_AZURE_STORAGE_ACCOUNT)  | jq  '.[0]["value"]' -r` 
+
+
 test_aws: setup
 	source venv/bin/activate && PYTHONWARNINGS=ignore python3 -m pytest aws_0*py
 
@@ -20,3 +27,4 @@ test: setup
 
 test_last: setup
 	source venv/bin/activate && python3 -m pytest `ls 0*py | sort | tail -n 1`
+

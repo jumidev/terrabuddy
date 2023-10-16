@@ -41,7 +41,7 @@ docker run -it test-terrabuddy
       - not all vars replaced
       - ~~no tfstate~~
       - ~~no such branch~~
-- clean azure storage tests, delete all tfstates older than x days
+- ~~clean azure storage tests, delete all tfstates~~
 - add exitcodes in custom exceptions intbcore, catch them in tb
 - test tb showvars
 - test tb --key
