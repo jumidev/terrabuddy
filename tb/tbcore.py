@@ -44,7 +44,7 @@ def get_tg_cachedir(salt, cleanup=True):
     if not os.path.isdir(wdir_d):
         # first time today tg has been run, clean up past cache
         if cleanup:
-            delfiles(wdir_root, 30)
+            clean_cache(wdir_root, 30)
         
     wdir_p = os.path.join(wdir_d, slug)
     os.makedirs(wdir_p)
@@ -71,7 +71,14 @@ def hcldump(obj):
 
     return hcls
 
-
+def recursive_dict_set(d, parts, val):
+    if len(parts) == 1:
+        d[parts[0]] = val
+    else:
+        if parts[0] not in d:
+            d[parts[0]] = {}
+            recursive_dict_set(d[parts[0]], parts[1:], val)
+            return
 class HclDumpException(Exception):
     pass
 
@@ -82,9 +89,9 @@ def hcldumplines(obj, recursions=0):
     if recursions == 0 and type(obj) != dict:
         raise HclDumpException("Top level object must be a dictionary")
 
-    if type(obj) == dict:
+    if type(obj) in (dict,  OrderedDict):
         if recursions > 0:
-            yield " "*recursions+'{\n'
+            yield "   "*(recursions-1)+'{\n'
         for k,v in obj.items():
             if type(k) != str:
                 raise HclDumpException("dictionary keys can only contain letters, numbers and underscores")
@@ -92,11 +99,11 @@ def hcldumplines(obj, recursions=0):
             matches = re.findall(HCL_KEY_RE, k)
             if len(matches) == 0:
                 raise HclDumpException("dictionary keys can only contain letters, numbers and underscores")
-            yield '{}{} = '.format(" "*recursions, k)
+            yield '{}{} = '.format("   "*recursions, k)
             yield from hcldumplines(v, nextrecursion)
             yield "{}\n".format(" "*recursions)
         if recursions > 0:
-            yield " "*recursions+'}\n'
+            yield "   "*(recursions-1)+'}\n'
     elif type(obj) == list:
         yield '{}['.format(" "*recursions)
 
@@ -191,12 +198,13 @@ def flatwalk(path):
         for fn in c:
             yield (folder, fn)
 
-def delfiles(d, olderthan_days=30):
+def clean_cache(d, olderthan_days=30):
     cutoff = (time.time())- olderthan_days * 86400
-    for folder, fn in flatwalk(d):
-        if os.path.getmtime(os.path.join(folder, fn)) < cutoff:
-            shutil.rmtree((os.path.join(folder, fn)))
-            os.remove(os.path.join(folder, fn))
+    for fn in os.scandir(d):
+        p = os.path.join(d, fn.name)
+        if os.path.isdir(p):
+            if os.path.getmtime(p) < cutoff:
+                shutil.rmtree(p)
 
 def dir_is_git_repo(dir):
     try:
@@ -839,7 +847,11 @@ class Project():
                 try:
 
                     val = tfstate["outputs"][which]["value"]
-                    inputs[k] = val
+                    if "." in k:
+                        parts = k.split(".")
+                        recursive_dict_set(inputs, parts, val)
+                    else:
+                        inputs[k] = val
                 except KeyError:
                     #raise ComponentException(which, tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir)
                     raise ComponentException("tfstate_inputs {} No such output in component {}".format(which, v))

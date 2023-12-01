@@ -5,7 +5,7 @@ import json, os, sys
 import argparse
 from pyfiglet import Figlet
 import tbcore
-from tbcore import run, runshow, log, debug, flatwalk, git_check, delfiles, hcldump, get_tg_cachedir
+from tbcore import run, runshow, log, debug, flatwalk, git_check, clean_cache, hcldump, get_tg_cachedir
 from tbcore import Utils, Project, WrapTerraform
 
 PACKAGE = "tb"

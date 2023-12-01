@@ -310,4 +310,10 @@ The above also works for feature branches.  If developer B is working on a featu
     - auto cleanup previous runs older than x days
     - auto manage remote states, 
     - enrypted remote states
-- example spoke and hub architecture 
+- tb catalog
+    - for given resource type, get dependency tree, required and optional
+- tb catalog-generator
+
+- tb chart
+    spin up a visualizer of current tb project
+- example spoke and hub architecture
