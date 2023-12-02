@@ -45,5 +45,31 @@ class TestTbLinkedProject(unittest.TestCase):
         assert retcode == 0
 
 
+    def test_mock_project_b_reads_a1_block_value_implicit_attr(self):
+
+        pdira = "mock/mockprojects/a_git_path_tag"
+        cdir = "component_a1"
+
+        a_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdira,
+                           '--set-var', 'source_tag=foo_and_random_string',
+                           '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
+        assert retcode == 0
+
+        pdir = "mock/mockprojects/c_git_branch"
+        cdir = "component_c3"
+
+        b_tfstore = get_random_string(10)
+
+        retcode = tb.main(["tb", "apply", cdir, '--force', 
+                           '--project-dir', pdir,
+                           '--set-var', 'project_a_path={}'.format(pdira), 
+                           '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
+                           '--set-var', 'test_linked_project_branch=test_linked_project',
+                           '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
+        assert retcode == 0
+
 if __name__ == '__main__':
     unittest.main()

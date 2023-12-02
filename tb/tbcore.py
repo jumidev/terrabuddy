@@ -788,8 +788,17 @@ class Project():
 
                 from_lp = False
                 which = None
-                if "_" in k:
+                if "." in k:
+                    # key is buried in a block
+                    which = k.split(".")[-1]
+                    if "_" in which:
+                        which = which.split("_")[-1]
+
+                elif "_" in k:
                     which = k.split("_")[-1]
+
+                else:
+                    which = k
 
                 if lp:
                     parts = v.split(":")
@@ -847,7 +856,7 @@ class Project():
                 try:
 
                     val = tfstate["outputs"][which]["value"]
-                    if "." in k:
+                    if "." in k: # key is buried in a block
                         parts = k.split(".")
                         recursive_dict_set(inputs, parts, val)
                     else:

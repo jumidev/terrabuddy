@@ -7,5 +7,5 @@ tfstate_store {
 }
 
 tfstate_inputs {
-    a1.block1.attr1 = "a:component_a1:foo" # explicit component_a1 attribute
+    a1.block1.foo = "a:component_a1" # missing explicit component_a1 attribute
 }
