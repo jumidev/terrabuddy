@@ -777,14 +777,14 @@ class Project():
     @property
     def component_inputs(self):
         obj = hcl.loads(self.hclfile)
-        # lazy-resolve tfstate_inputs here
+        # lazy-resolve component_inputs here
 
         inputs = obj["inputs"]
 
-        if "tfstate_inputs" in obj:
+        if "component_inputs" in obj:
             lp = self.get_linked_projects()
 
-            for k,v in obj["tfstate_inputs"].items():
+            for k,v in obj["component_inputs"].items():
 
                 from_lp = False
                 which = None
@@ -842,13 +842,13 @@ class Project():
                     t = project.component_type(component=v)
 
                     if t != "component":
-                        raise ComponentException("tfstate_inputs key {} = \"{}\" must point to a component".format(k, v))
+                        raise ComponentException("component_inputs key {} = \"{}\" must point to a component".format(k, v))
 
                     project.set_tf_dir(d)
                     project.save_parsed_component()
 
                 if not os.path.isfile(tfstate_file):
-                    raise ComponentException("Missing terraform.tfstate file for tfstate_inputs key {} = \"{}\"".format(k, v))
+                    raise ComponentException("Missing terraform.tfstate file for component_inputs key {} = \"{}\"".format(k, v))
 
                 with open(tfstate_file, 'r') as fh:
                     tfstate = json.load(fh)
@@ -863,7 +863,7 @@ class Project():
                         inputs[k] = val
                 except KeyError:
                     #raise ComponentException(which, tfstate_file, k, v, t, cdir, p.tf_dir, lp_name, p.wdir)
-                    raise ComponentException("tfstate_inputs {} No such output in component {}".format(which, v))
+                    raise ComponentException("component_inputs {} No such output in component {}".format(which, v))
 
         for k in cloud_cred_keys():
             if k in os.environ:

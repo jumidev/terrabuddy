@@ -19,7 +19,7 @@ inputs {
 	}
 }
 
-tfstate_inputs {
+component_inputs {
 	resource_group_name = "azurerm/resource_group_vnet"
 }
 

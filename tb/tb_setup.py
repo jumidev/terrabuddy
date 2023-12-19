@@ -136,7 +136,7 @@ class ProjectSetup():
                     target = v["path"]
 
                 link_info += "\nLink: {} -> {}".format(k, target)
-                link_info += "\nUsage in tfstate_inputs: <some_input>: {}:path/to/component:<some_key>".format(k)
+                link_info += "\nUsage in component_inputs: <some_input>: {}:path/to/component:<some_key>".format(k)
                 link_info += "\n"
 
             ans = button_dialog(

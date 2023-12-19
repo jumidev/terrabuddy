@@ -32,8 +32,8 @@ docker run -it test-terrabuddy
 - test azurerm
    - ~~rg and tfstate~~
 - test aws bundle
-- test list type tfstate_inputs
-- test dict type tfstate_inputs
+- test list type component_inputs
+- test dict type component_inputs
 - linked projects
    - ~~path~~
    - ~~git~~
@@ -42,7 +42,7 @@ docker run -it test-terrabuddy
       - ~~no tfstate~~
       - ~~no such branch~~
 - ~~clean azure storage tests, delete all tfstates~~
-- tfstate_inputs, add support for blocks.
+- component_inputs, add support for blocks.
       e.g. in network_security_group, inputs
       
 - add exitcodes in custom exceptions intbcore, catch them in tb

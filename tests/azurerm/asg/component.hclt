@@ -7,7 +7,7 @@ inputs {
 	name = "test_asg_${run_id}"
 }
 
-tfstate_inputs {
+component_inputs {
 	resource_group_name = "azurerm/resource_group_vnet"
 }
 

@@ -59,7 +59,7 @@ class TestTbLinkedProject(unittest.TestCase):
                            '--set-var', "tfstate_store_path_b={}".format(os.path.join(self.root_dir, b_tfstore))])
             assert False
         except ComponentException as e:
-            assert "Missing terraform.tfstate file for tfstate_inputs key" in str(e)
+            assert "Missing terraform.tfstate file for component_inputs key" in str(e)
         except:
             raise
 
