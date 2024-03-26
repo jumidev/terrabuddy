@@ -3,8 +3,8 @@
 
 import os, sys, shutil
 import unittest
-from tbcore import Project, TfStateStoreAwsS3, WrongPasswordException
-from tbcore import assert_aws_creds, get_random_string
+from cloudicorn_core import Project, TfStateStoreAwsS3, WrongPasswordException
+from cloudicorn_core import assert_aws_creds, get_random_string
 import hcl, tempfile, datetime
 from pathlib import Path
 import random
@@ -14,7 +14,7 @@ import string
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
 
 
-class TestTbAwsS3StateStore(unittest.TestCase):
+class TestAwsS3StateStore(unittest.TestCase):
 
     def setUp(self):
         assert_aws_creds()

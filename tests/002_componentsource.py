@@ -3,12 +3,12 @@
 
 import os, sys
 import unittest
-from tbcore import Project, ComponentSourceGit, ComponentSourcePath, ComponentSourceException
-import tb, json
+from cloudicorn_core import Project, ComponentSourceGit, ComponentSourcePath, ComponentSourceException
+import cloudicorn, json
 import hcl, tempfile
 
 
-class TestTbComponentSource(unittest.TestCase):
+class TestComponentSource(unittest.TestCase):
 
     def setUp(self):
         pass
@@ -47,7 +47,7 @@ class TestTbComponentSource(unittest.TestCase):
     def test_mock_component_source_gitssh_componentoverride(self):
 
         p = tempfile.mkdtemp()
-        retcode = tb.main(["tb", "apply", "mock/mocksource/git_componentoverride", "--force", 
+        retcode = cloudicorn.main(["cloudicorn", "apply", "mock/mocksource/git_componentoverride", "--force", 
                            "--set-var", "test_tfstate_path={}".format(p)])
         assert retcode == 0 # all variables substituted
 

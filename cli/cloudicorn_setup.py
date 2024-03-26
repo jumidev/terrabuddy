@@ -3,8 +3,8 @@
 
 import sys,  yaml, os
 
-from tbcore import log, Utils, assert_aws_creds, assert_azurerm_sp_creds, azurerm_sp_cred_keys, aws_cred_keys, aws_test_creds
-from tbcore import git_rootdir, run, HclParseException, get_random_string
+from cloudicorn_core import log, Utils, assert_aws_creds, assert_azurerm_sp_creds, azurerm_sp_cred_keys, aws_cred_keys, aws_test_creds
+from cloudicorn_core import git_rootdir, run, HclParseException, get_random_string
 from git import Repo
 from pathlib import Path
 import re, tempfile
@@ -14,7 +14,7 @@ import hcl
 
 import boto3
 
-PACKAGE = "tb_setup"
+PACKAGE = "cloudicorn_setup"
 LOG = True
 DEBUG=False
 
@@ -674,7 +674,7 @@ def main(argv=[]):
     parser.add_argument('--debug', action='store_true', help='display debug messages')
     args = parser.parse_args(args=argv)
 
-    if args.debug or os.getenv('TB_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
+    if args.debug or os.getenv('CLOUDICORN_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
         global DEBUG
         DEBUG = True
         log("debug mode enabled")
@@ -808,7 +808,7 @@ def main(argv=[]):
             e.sort()
 
             for k in e:
-                if k.startswith("TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"):
+                if k.startswith("CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"):
                     v = os.getenv(k)
                     p = v[:5] + '*'*(len(v)-5)
                     tfstate_store_encryption_passphrases.append("{}={}".format(k, p))
@@ -825,7 +825,7 @@ def main(argv=[]):
                 ans = button_dialog(
                 title='Confirm',
                 buttons=[("Cancel", False), ("Change password", True)],
-                text='A new passphrase will be generated and saved to .envrc. The current passphrase will be saved to TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD.  As tb apply is run, tfstate files will be decrypted using the old password and reencrypted using the new. Any other users or tasks that read the tfstate will need to have the encryption key to read them.').run()
+                text='A new passphrase will be generated and saved to .envrc. The current passphrase will be saved to CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD.  As cloudicorn apply is run, tfstate files will be decrypted using the old password and reencrypted using the new. Any other users or tasks that read the tfstate will need to have the encryption key to read them.').run()
 
                 if not ans:
                     continue
@@ -847,23 +847,23 @@ def main(argv=[]):
             envrc = []
             with open(".envrc", 'r') as fh:
                 for line in fh.readlines():
-                    if line.startswith("export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE="):
-                        line = "export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD="+line.split("=",1)[1]+"\n"
-                        os.environ["TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD"] = line.split("=",1)[1]
+                    if line.startswith("export CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE="):
+                        line = "export CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD="+line.split("=",1)[1]+"\n"
+                        os.environ["CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE_OLD"] = line.split("=",1)[1]
 
                     envrc.append(line)
 
 
-            envrc.append("export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE={}".format(passphrase))
+            envrc.append("export CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE={}".format(passphrase))
             with open(".envrc", 'w') as fh:
                 for l in envrc:
                     fh.writelines(l)
 
-            os.environ["TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"] = passphrase
+            os.environ["CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"] = passphrase
 
             message_dialog(
             title='Done',
-            text='TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE saved to .envrc.').run()
+            text='CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE saved to .envrc.').run()
 
             time.sleep(0.3)
 

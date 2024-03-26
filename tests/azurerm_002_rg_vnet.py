@@ -3,13 +3,13 @@
 
 import os
 import unittest
-from tbcore import assert_azurerm_sp_creds, get_random_string, AzureUtils, TerraformException
+from cloudicorn_core import assert_azurerm_sp_creds, get_random_string, AzureUtils, TerraformException
 import datetime, tb
 
 TEST_AZURE_STORAGE_ACCOUNT = os.getenv("TEST_AZURE_STORAGE_ACCOUNT", None)
 TEST_AZURE_STORAGE_CONTAINER = os.getenv("TEST_AZURE_STORAGE_CONTAINER", None)
 
-class TestTbAzureRgVnetStateStore(unittest.TestCase):
+class TestAzureRgVnetStateStore(unittest.TestCase):
 
     def setUp(self):
         assert_azurerm_sp_creds()
@@ -22,12 +22,12 @@ class TestTbAzureRgVnetStateStore(unittest.TestCase):
         self.resource_client =  self.azure_utils.resource_client
         cdir = "azurerm/resource_group_vnet"
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         cdir = "azurerm/resource_group_vnet"
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string2)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string2)])
         assert retcode == 0
 
     def tearDown(self):
@@ -43,19 +43,19 @@ class TestTbAzureRgVnetStateStore(unittest.TestCase):
         ]
         for cdir in cdirs: 
 
-            retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+            retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
             assert retcode == 0
 
     def test_vnet_asg_etc_fail_then_success(self):
 
         cdir = "azurerm/nsg_failapply"
         try:
-            retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'fail_rule_priority=300', '--set-var', "run_id={}".format(self.run_string2)])
+            retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', 'fail_rule_priority=300', '--set-var', "run_id={}".format(self.run_string2)])
             assert False
         except TerraformException:
             pass
     
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'fail_rule_priority=301', '--set-var', "run_id={}".format(self.run_string2)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', 'fail_rule_priority=301', '--set-var', "run_id={}".format(self.run_string2)])
         assert retcode == 0
 
 if __name__ == '__main__':

@@ -13,7 +13,7 @@ with open("requirements.txt", "r") as fh:
 
 setup(name='cloudicorn',
     version='0.1',
-    description='A python wrapper for multipass',
+    description='Taking Infrastructure As Code to the next level',
     long_description=long_description,
     long_description_content_type="text/markdown",      
     url='https://github.com/jumidev/cloudicorn',
@@ -25,8 +25,8 @@ setup(name='cloudicorn',
     install_requires=install_requires,
     entry_points = {
               'console_scripts': [
-                  'tb=tb:cli_entrypoint',              
-                  'tb_setup=tb_setup:cli_entrypoint'              
+                  'cloudicorn=cloudicorn:cli_entrypoint',              
+                  'cloudicorn_setup=cloudicorn_setup:cli_entrypoint'              
                 ]     
           },
 

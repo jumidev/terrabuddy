@@ -3,10 +3,10 @@
 
 import os, shutil
 import unittest
-import tb, tempfile
-from tbcore import get_random_string, ComponentSourceException, ComponentException
+import cloudicorn, tempfile
+from cloudicorn_core import get_random_string, ComponentSourceException, ComponentException
 
-class TestTbLinkedProject(unittest.TestCase):
+class TestLinkedProject(unittest.TestCase):
 
     def setUp(self):
         self.root_dir = tempfile.mkdtemp()
@@ -24,7 +24,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         a_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdira,
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
         assert retcode == 0
@@ -34,7 +34,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         b_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdir,
                            '--set-var', 'project_a_path={}'.format(pdira), 
                            '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)), 
@@ -52,7 +52,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         b_tfstore = get_random_string(10)
         try:
-            retcode = tb.main(["tb", "apply", cdir, '--force', 
+            retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdir,
                            '--set-var', 'project_a_path={}'.format(pdira), 
                            '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)), 
@@ -71,7 +71,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         a_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdira,
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
         assert retcode == 0
@@ -81,7 +81,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         b_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdir,
                            '--set-var', 'project_a_path={}'.format(pdira), 
                            '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
@@ -96,7 +96,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         a_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdira,
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
         assert retcode == 0
@@ -107,7 +107,7 @@ class TestTbLinkedProject(unittest.TestCase):
         b_tfstore = get_random_string(10)
 
         try:
-            retcode = tb.main(["tb", "apply", cdir, '--force', 
+            retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                             '--project-dir', pdir,
                             '--set-var', 'project_a_path={}'.format(pdira), 
                             '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
@@ -128,7 +128,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         a_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdira,
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
         assert retcode == 0
@@ -138,7 +138,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         b_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdir,
                            '--set-var', 'project_a_path={}'.format(pdira), 
                            '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
@@ -153,7 +153,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         a_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdira,
                            '--set-var', 'source_tag=foo_and_random_string',
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
@@ -164,7 +164,7 @@ class TestTbLinkedProject(unittest.TestCase):
 
         b_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdir,
                            '--set-var', 'project_a_path={}'.format(pdira), 
                            '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
@@ -181,7 +181,7 @@ class TestTbLinkedProject(unittest.TestCase):
         b_tfstore = get_random_string(10)
 
         try:
-            retcode = tb.main(["tb", "apply", cdir, '--force', 
+            retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                             '--project-dir', pdir,
                             '--set-var', 'tfstate_store_path_a={}'.format(os.path.join(self.root_dir, a_tfstore)),
                             '--set-var', 'test_linked_project_branch=BAD_BRANCH',

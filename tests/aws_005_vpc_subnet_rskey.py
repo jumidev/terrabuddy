@@ -3,9 +3,9 @@
 
 import os
 import unittest
-import tb
-from tbcore import ComponentException
-from tbcore import assert_aws_creds
+import cloudicorn
+from cloudicorn_core import ComponentException
+from cloudicorn_core import assert_aws_creds
 import random
 import string
 
@@ -19,7 +19,7 @@ def get_random_string(length):
     result_str = ''.join(random.choice(letters) for i in range(length))
     return str(result_str)
 
-class TestTbAwsVpcSubnet(unittest.TestCase):
+class TestAwsVpcSubnet(unittest.TestCase):
 
     def setUp(self):
         # make copy of env vars
@@ -34,13 +34,13 @@ class TestTbAwsVpcSubnet(unittest.TestCase):
         # make vpc
         cdir = "aws/vpc_tfstate"
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
         assert retcode == 0
 
     def tearDown(self):
         cdir = "aws/subnet_tfstate"
 
-        retcode = tb.main(["tb", "destroy", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "destroy", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
         assert retcode == 0
 
         response = self.describe_subnets()
@@ -69,17 +69,17 @@ class TestTbAwsVpcSubnet(unittest.TestCase):
     
     def test_apply_subnet_success(self):
         cdir = "aws/subnet_tfstate"
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
         assert retcode == 0
 
         # second apply, should also succeed with no changes
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', 'run_id={}'.format(self.run_string)])
         assert retcode == 0
 
     def test_apply_delete_subnet_failmode_not_a_component(self):
         cdir = "aws/subnet_tfstate_fail"
         try:
-            tb.main(["tb", "apply", cdir, '--force',
+            cloudicorn.main(["cloudicorn", "apply", cdir, '--force',
                     '--set-var', 'run_id={}'.format(self.run_string),
                     '--set-var', 'tfstate_link=FAIL'
                     ])
@@ -90,7 +90,7 @@ class TestTbAwsVpcSubnet(unittest.TestCase):
     def test_apply_delete_subnet_failmode_no_such_tfstate_output(self):
         cdir = "aws/subnet_tfstate_fail"
         try:
-            tb.main(["tb", "apply", cdir, '--force',
+            cloudicorn.main(["cloudicorn", "apply", cdir, '--force',
                     '--set-var', 'run_id={}'.format(self.run_string),
                     '--set-var', 'tfstate_link=aws/vpc_tfstate:lol'
                     ])

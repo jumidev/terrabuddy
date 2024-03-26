@@ -193,7 +193,7 @@ $ tb showvars prep/bastion/managed_disk
 COMPONENT_DIRNAME=managed_disk
 COMPONENT_PATH=prep/bastion/managed_disk
 PROJECT_ROOT=/home/user/myprojects/az-platform-infra
-TB_INSTALL_PATH=/home/user/wf/cloudicorn/tb
+CLOUDICORN_INSTALL_PATH=/home/user/wf/cloudicorn/tb
 appname=bastion
 env=prep
 location=westeurope

@@ -3,10 +3,10 @@
 
 import os, sys
 import unittest
-from tbcore import Project, ComponentSourceGit
+from cloudicorn_core import Project, ComponentSourceGit
 import hcl, tempfile
 
-class TestTbAwsVpc(unittest.TestCase):
+class TestAwsVpc(unittest.TestCase):
 
     def setUp(self):
         pass

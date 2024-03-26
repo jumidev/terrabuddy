@@ -3,9 +3,9 @@
 
 import os, hcl, tempfile, json
 import unittest
-import tb
-from tbcore import Project, TfStateStoreAwsS3
-from tbcore import assert_aws_creds
+import cloudicorn
+from cloudicorn_core import Project, TfStateStoreAwsS3
+from cloudicorn_core import assert_aws_creds
 import random
 import string
 
@@ -19,7 +19,7 @@ def get_random_string(length):
     result_str = ''.join(random.choice(letters) for i in range(length))
     return str(result_str)
 
-class TestTbAwsPlanVpc(unittest.TestCase):
+class TestAwsPlanVpc(unittest.TestCase):
 
     def setUp(self):       
         
@@ -41,7 +41,7 @@ class TestTbAwsPlanVpc(unittest.TestCase):
             )        
 
     def test_plan(self):
-        retcode = tb.main(["tb", "plan", "aws/vpc", "--allow-no-tfstate-store"])
+        retcode = cloudicorn.main(["cloudicorn", "plan", "aws/vpc", "--allow-no-tfstate-store"])
         assert retcode == 0
 
     def describe_vpcs(self):
@@ -53,7 +53,7 @@ class TestTbAwsPlanVpc(unittest.TestCase):
 
         cdir = "aws/vpc_tfstate"
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # assert vpc exists
@@ -81,11 +81,11 @@ class TestTbAwsPlanVpc(unittest.TestCase):
         assert rs["outputs"]["name"]["value"] == "example vpc {}".format(self.run_string)
 
         # apply again, should return 0
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # now destroy
-        retcode = tb.main(["tb", "destroy", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "destroy", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # assert vpc gone

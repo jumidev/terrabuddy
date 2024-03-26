@@ -3,9 +3,9 @@
 
 import os, sys, hcl, tempfile, json
 import unittest
-import tb
-from tbcore import Project, TfStateStoreAwsS3
-from tbcore import assert_aws_creds, get_random_string
+import cloudicorn
+from cloudicorn_core import Project, TfStateStoreAwsS3
+from cloudicorn_core import assert_aws_creds, get_random_string
 import random
 import string
 
@@ -15,7 +15,7 @@ import botocore
 
 TEST_S3_BUCKET = os.getenv("TEST_S3_BUCKET", None)
 
-class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
+class TestAwsPlanVpcEncrypted(unittest.TestCase):
 
     def setUp(self):
         # make copy of env vars
@@ -52,8 +52,8 @@ class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
 
         random_passphrase = get_random_string(32)
 
-        os.environ["TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"] = random_passphrase
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        os.environ["CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"] = random_passphrase
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # assert vpc exists
@@ -78,7 +78,7 @@ class TestTbAwsPlanVpcEncrypted(unittest.TestCase):
         assert crs.is_encrypted
 
         # now destroy
-        retcode = tb.main(["tb", "destroy", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "destroy", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # assert vpc gone

@@ -16,7 +16,7 @@ test_aws_last:
 	cd tests && make test_aws_last
 
 install:
-	cd tb && make install
+	cd cli && make install
 
 build_test_docker:
 	docker build . -f Dockerfile-tests -t test-cloudicorn
@@ -25,6 +25,6 @@ test_docker: build_test_docker
 	docker run -it test-cloudicorn
 
 publish_pypi:
-	cd tb && rm -rf dist build && \
+	cd cli && rm -rf dist build && \
 	python3 setup.py sdist bdist_wheel && \
 	python3 -m twine upload dist/*

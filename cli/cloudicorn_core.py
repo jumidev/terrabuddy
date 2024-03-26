@@ -29,11 +29,11 @@ from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.resource  import  ResourceManagementClient
 from azure.core.exceptions import ResourceNotFoundError
 
-PACKAGE = "tb"
+PACKAGE = "cloudicorn"
 LOG = True
 DEBUG=False
 
-def get_tg_cachedir(salt, cleanup=True):
+def get_cloudicorn_cachedir(salt, cleanup=True):
     current_date_slug = datetime.today().strftime('%Y-%m-%d')
     
     slug = hashlib.sha224("{}{}".format(get_random_string(64),salt).encode('utf-8')).hexdigest()
@@ -41,8 +41,11 @@ def get_tg_cachedir(salt, cleanup=True):
 
     wdir_d = os.path.join(wdir_root, current_date_slug)
 
+    if not os.path.isdir(wdir_root):
+        os.makedirs(wdir_root)
+
     if not os.path.isdir(wdir_d):
-        # first time today tg has been run, clean up past cache
+        # first time today cloudicorn has been run, clean up past cache
         if cleanup:
             clean_cache(wdir_root, 30)
         
@@ -295,35 +298,35 @@ def git_check(wdir='.'):
         return(-1)
     else:
     
-        TB_GIT_DEFAULT_BRANCH = os.getenv('TB_GIT_DEFAULT_BRANCH', 'master')
+        CLOUDICORN_GIT_DEFAULT_BRANCH = os.getenv('CLOUDICORN_GIT_DEFAULT_BRANCH', 'master')
         
-        if branch != TB_GIT_DEFAULT_BRANCH:
+        if branch != CLOUDICORN_GIT_DEFAULT_BRANCH:
             '''
                 in this case assume we're on a feature branch
                 if the FB is behind master then issue a warning
             '''
-            command = "git -C {} branch -vv | grep {} ".format(git_root, TB_GIT_DEFAULT_BRANCH)
+            command = "git -C {} branch -vv | grep {} ".format(git_root, CLOUDICORN_GIT_DEFAULT_BRANCH)
             (origin_master, err, exitcode) = run(command)
             if exitcode != 0:
                 '''
-                In this case the git repo does not contain TB_GIT_DEFAULT_BRANCH, so I guess assume that we're 
+                In this case the git repo does not contain CLOUDICORN_GIT_DEFAULT_BRANCH, so I guess assume that we're 
                 on the default branch afterall and that we're up to date persuant to the above code
                 '''
                 return 0
             
             for line in origin_master.split("\n"):
-                if line.strip().startswith(TB_GIT_DEFAULT_BRANCH):
+                if line.strip().startswith(CLOUDICORN_GIT_DEFAULT_BRANCH):
                     origin = line.strip().split('[')[1].split('/')[0]
 
             assert origin != None
 
-            command = "git -C {} rev-list --left-right --count \"{}...{}/{}\"".format(git_root, branch, origin, TB_GIT_DEFAULT_BRANCH)
+            command = "git -C {} rev-list --left-right --count \"{}...{}/{}\"".format(git_root, branch, origin, CLOUDICORN_GIT_DEFAULT_BRANCH)
             (ahead_behind, err, exitcode) = run(command)
             ahead_behind = ahead_behind.strip().split("\t")
             ahead = int(ahead_behind[0])
             behind = int(ahead_behind.pop())
 
-            command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, TB_GIT_DEFAULT_BRANCH)
+            command = "git -C {} rev-list --left-right --count \"{}...{}\"".format(git_root, branch, CLOUDICORN_GIT_DEFAULT_BRANCH)
             (ahead_behind, err, exitcode) = run(command)
             ahead_behind = ahead_behind.strip().split("\t")
             local_ahead = int(ahead_behind[0])
@@ -332,16 +335,16 @@ def git_check(wdir='.'):
             
             if behind > 0:
                 sys.stderr.write("")
-                sys.stderr.write("GIT WARNING: Your branch, {}, is {} commit(s) behind {}/{}.\n".format(branch, behind, origin, TB_GIT_DEFAULT_BRANCH))
-                sys.stderr.write("This action may clobber new changes that have occurred in {} since your branch was made.\n".format(TB_GIT_DEFAULT_BRANCH))
-                sys.stderr.write("It is recommended that you stop now and merge or rebase from {}\n".format(TB_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("GIT WARNING: Your branch, {}, is {} commit(s) behind {}/{}.\n".format(branch, behind, origin, CLOUDICORN_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("This action may clobber new changes that have occurred in {} since your branch was made.\n".format(CLOUDICORN_GIT_DEFAULT_BRANCH))
+                sys.stderr.write("It is recommended that you stop now and merge or rebase from {}\n".format(CLOUDICORN_GIT_DEFAULT_BRANCH))
                 sys.stderr.write("\n")
                 
                 if ahead != local_ahead or behind != local_behind:
                     sys.stderr.write("")
-                    sys.stderr.write("INFO: your local {} branch is not up to date with {}/{}\n".format(TB_GIT_DEFAULT_BRANCH, origin, TB_GIT_DEFAULT_BRANCH))
+                    sys.stderr.write("INFO: your local {} branch is not up to date with {}/{}\n".format(CLOUDICORN_GIT_DEFAULT_BRANCH, origin, CLOUDICORN_GIT_DEFAULT_BRANCH))
                     sys.stderr.write("HINT:")
-                    sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(TB_GIT_DEFAULT_BRANCH, branch))
+                    sys.stderr.write("git checkout {} ; git pull ; git checkout {}\n".format(CLOUDICORN_GIT_DEFAULT_BRANCH, branch))
                     sys.stderr.write("\n")
                     
                 answer = input("Do you want to continue anyway? [y/N]? ").lower()
@@ -449,7 +452,7 @@ class Project():
         self.component_dir=dir
 
         cdir_slug = dir.replace('/', '_')
-        tf_wdir_p = get_tg_cachedir(self.project_root+cdir_slug)
+        tf_wdir_p = get_cloudicorn_cachedir(self.project_root+cdir_slug)
 
         tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
         os.makedirs(tf_wdir)
@@ -652,9 +655,9 @@ class Project():
             self.vars["COMPONENT_PATH"] = self.component_path
             self.vars["COMPONENT_DIRNAME"] = self.component_path.split("/")[-1]
             try:
-                self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
+                self.vars["CLOUDICORN_INSTALL_PATH"] = os.path.dirname(os.path.abspath(os.readlink(__file__)))
             except OSError:
-                self.vars["TB_INSTALL_PATH"] = os.path.dirname(os.path.abspath(__file__))
+                self.vars["CLOUDICORN_INSTALL_PATH"] = os.path.dirname(os.path.abspath(__file__))
 
             problems = self.parse_items()
 
@@ -733,13 +736,13 @@ class Project():
 
                 if "repo" in source:
                     i = LinkedProjectSourceGit(args=source)
-                    targetdir = get_tg_cachedir(json.dumps(source)+linked_project_name)
-                    tfdir = get_tg_cachedir(json.dumps(source)+"tfdir")
+                    targetdir = get_cloudicorn_cachedir(json.dumps(source)+linked_project_name)
+                    tfdir = get_cloudicorn_cachedir(json.dumps(source)+"tfdir")
 
                 elif "path" in source:
                     i = LinkedProjectSourcePath(args=source)
-                    targetdir = get_tg_cachedir(source["path"]+linked_project_name)
-                    tfdir = get_tg_cachedir(source["path"]+"tfdir")
+                    targetdir = get_cloudicorn_cachedir(source["path"]+linked_project_name)
+                    tfdir = get_cloudicorn_cachedir(source["path"]+"tfdir")
 
                 else:
                     raise ProjectException("No handler for LinkedProjectSource")
@@ -1627,7 +1630,7 @@ class Utils():
         elif "Your version of Terraform is out of date" in out and updates:
             outofdate.append("terraform")
             if verbose:
-                log("Your version of terraform is out of date! You can update by running 'tb --setup', or by manually downloading from https://www.terraform.io/downloads.html")
+                log("Your version of terraform is out of date! You can update by running 'cloudicorn_setup', or by manually downloading from https://www.terraform.io/downloads.html")
 
         return (missing, outofdate)
 
@@ -1692,10 +1695,10 @@ class Utils():
                 bashrc = fh.readlines()
 
             lines = (
-                "alias tby='export TB_APPROVE=true'",
-                "alias tbn='export TB_APPROVE=false'",
-                "alias tbgf='export TB_GIT_FILTER=true'",
-                "alias tbgfn='export TB_GIT_FILTER=false'")
+                "alias cloudi_y='export CLOUDICORN_APPROVE=true'",
+                "alias cloudi_n='export CLOUDICORN_APPROVE=false'",
+                "alias cloudi_gf='export CLOUDICORN_GIT_FILTER=true'",
+                "alias cloudi_gfn='export CLOUDICORN_GIT_FILTER=false'")
 
             with open(os.path.expanduser('~/.bashrc'), "a") as fh:  
                 for l in lines:

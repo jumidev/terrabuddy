@@ -3,13 +3,13 @@
 
 import os
 import unittest
-from tbcore import assert_azurerm_sp_creds, get_random_string, AzureUtils
+from cloudicorn_core import assert_azurerm_sp_creds, get_random_string, AzureUtils
 import datetime, tb
 
 TEST_AZURE_STORAGE_ACCOUNT = os.getenv("TEST_AZURE_STORAGE_ACCOUNT", None)
 TEST_AZURE_STORAGE_CONTAINER = os.getenv("TEST_AZURE_STORAGE_CONTAINER", None)
 
-class TestTbAzureRgStateStore(unittest.TestCase):
+class TestAzureRgStateStore(unittest.TestCase):
 
     def setUp(self):
         assert_azurerm_sp_creds()
@@ -27,11 +27,11 @@ class TestTbAzureRgStateStore(unittest.TestCase):
 
         cdir = "azurerm/resource_group"
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
         # second apply, should not change anything
-        retcode = tb.main(["tb", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', '--set-var', "run_id={}".format(self.run_string)])
         assert retcode == 0
 
 if __name__ == '__main__':

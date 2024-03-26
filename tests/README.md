@@ -45,7 +45,7 @@ docker run -it test-cloudicorn
 - component_inputs, add support for blocks.
       e.g. in network_security_group, inputs
       
-- add exitcodes in custom exceptions intbcore, catch them in tb
+- add exitcodes in custom exceptions incloudicorn_core, catch them in tb
 - test tb showvars
 - test tb --key
 - tb support all arguments in env var format

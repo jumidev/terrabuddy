@@ -4,7 +4,7 @@ setup:
 	python3 -m venv venv
 	source venv/bin/activate && PYTHONWARNINGS=ignore pip uninstall cloudicorn -y
 	source venv/bin/activate && PYTHONWARNINGS=ignore pip install -r requirements.txt
-	source venv/bin/activate && PYTHONWARNINGS=ignore cd ../tb && python3 setup.py install 
+	source venv/bin/activate && PYTHONWARNINGS=ignore cd ../cli && python3 setup.py install 
 
 test_azurerm: setup
 	source venv/bin/activate && PYTHONWARNINGS=ignore python3 -m pytest azurerm_0*py

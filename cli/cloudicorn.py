@@ -4,11 +4,11 @@
 import json, os, sys
 import argparse
 from pyfiglet import Figlet
-import tbcore
-from tbcore import run, runshow, log, debug, flatwalk, git_check, clean_cache, hcldump, get_tg_cachedir
-from tbcore import Utils, Project, WrapTerraform
+import cloudicorn_core
+from cloudicorn_core import run, runshow, log, debug, flatwalk, git_check, clean_cache, hcldump, get_cloudicorn_cachedir
+from cloudicorn_core import Utils, Project, WrapTerraform
 
-PACKAGE = "tb"
+PACKAGE = "cloudicorn"
 LOG = True
 DEBUG=False
 
@@ -16,19 +16,19 @@ def main(argv=[]):
 
     epilog = """The following arguments can be activated using environment variables:
 
-    export TB_DEBUG=y                   # activates debug messages
-    export TB_APPROVE=y                 # activates --yes
-    export TB_GIT_CHECK=y               # activates --git-check
-    export TB_NO_GIT_CHECK=y            # activates --no-git-check
-    export TB_MODULES_PATH              # required if using --dev
-    export TB_GIT_FILTER                # when displaying components, only show those which have uncomitted git files
-    export TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE #if set, passphrase to encrypt and decrypt remote state files at rest
+    export CLOUDICORN_DEBUG=y                   # activates debug messages
+    export CLOUDICORN_APPROVE=y                 # activates --yes
+    export CLOUDICORN_GIT_CHECK=y               # activates --git-check
+    export CLOUDICORN_NO_GIT_CHECK=y            # activates --no-git-check
+    export CLOUDICORN_MODULES_PATH              # required if using --dev
+    export CLOUDICORN_GIT_FILTER                # when displaying components, only show those which have uncomitted git files
+    export CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE #if set, passphrase to encrypt and decrypt remote state files at rest
     """
     #TGARGS=("--force", "-f", "-y", "--yes", "--clean", "--dev", "--no-check-git")
 
     f = Figlet(font='slant')
 
-    parser = argparse.ArgumentParser(description='{}\nTB, facilitates terraform with nifty features n such.'.format(f.renderText('cloudicorn')),
+    parser = argparse.ArgumentParser(description='{}\nCLOUDICORN, facilitates terraform with nifty features n such.'.format(f.renderText('cloudicorn')),
     add_help=True,
     epilog=epilog,
     formatter_class=argparse.RawTextHelpFormatter)
@@ -68,7 +68,7 @@ def main(argv=[]):
     if args.quiet or args.json:
         LOG = False
 
-    if args.debug or os.getenv('TB_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
+    if args.debug or os.getenv('CLOUDICORN_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
         global DEBUG
         DEBUG = True
         log("debug mode enabled")
@@ -92,11 +92,11 @@ def main(argv=[]):
     e.sort()
 
     for k in e:
-        if k.startswith("TB_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"):
+        if k.startswith("CLOUDICORN_TFSTATE_STORE_ENCRYPTION_PASSPHRASE"):
             tfstate_store_encryption_passphrases.append(os.getenv(k))
 
-    git_filtered = str(os.getenv('TB_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
-    force = str(os.getenv('TB_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
+    git_filtered = str(os.getenv('CLOUDICORN_GIT_FILTER', args.git_filter)).lower()  in ("on", "true", "1", "yes")
+    force = str(os.getenv('CLOUDICORN_APPROVE', args.force)).lower()  in ("on", "true", "1", "yes")
 
     project_vars = {}
 
@@ -133,10 +133,10 @@ def main(argv=[]):
         # [0:5] to also include "*-all" command variants
         CHECK_GIT = True
 
-    if args.check_git or os.getenv('TB_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1']:
+    if args.check_git or os.getenv('CLOUDICORN_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1']:
         CHECK_GIT = True
 
-    if args.no_check_git or os.getenv('TB_NO_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1'] :
+    if args.no_check_git or os.getenv('CLOUDICORN_NO_GIT_CHECK', 'n')[0].lower() in ['y', 't', '1'] :
         CHECK_GIT = False
 
     # check git
@@ -176,7 +176,7 @@ def main(argv=[]):
         project.set_component_dir(cdir)
 
         # cdir_slug = cdir.replace('/', '_')
-        # tf_wdir_p = get_tg_cachedir(project.project_root+cdir_slug)
+        # tf_wdir_p = get_cloudicorn_cachedir(project.project_root+cdir_slug)
 
         # tf_wdir = '{}/{}'.format(tf_wdir_p, cdir_slug)
         # os.makedirs(tf_wdir)
@@ -246,7 +246,7 @@ def main(argv=[]):
                     
                     exitcode = runshow(cmd, cwd=project.tf_dir)
                     if exitcode != 0:
-                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(project.tf_dir, cmd))
+                        raise cloudicorn_core.TerraformException("\ndir={}\ncmd={}".format(project.tf_dir, cmd))
                                         
                     # requested command
                     extra_args = ['-state=terraform.tfstate']
@@ -267,7 +267,7 @@ def main(argv=[]):
                     # save tfstate
                     crs.push()
                     if exitcode != 0:
-                        raise tbcore.TerraformException("\ndir={}\ncmd={}".format(project.tf_dir, cmd))
+                        raise cloudicorn_core.TerraformException("\ndir={}\ncmd={}".format(project.tf_dir, cmd))
 
                     return 0
 

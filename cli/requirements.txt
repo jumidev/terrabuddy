@@ -12,5 +12,8 @@ boto3
 PyCryptodome
 prompt_toolkit
 
-azure-cli
+#azure-cli
 azure-storage-blob
+azure-cli==2.57.0
+#azure-cli-core==2.53.0
+azure-storage-blob==12.19.1

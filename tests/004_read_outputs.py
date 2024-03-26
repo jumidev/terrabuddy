@@ -3,10 +3,10 @@
 
 import os, shutil
 import unittest
-import tb, tempfile
-from tbcore import get_random_string, ComponentSourceException, ComponentException, Project
+import cloudicorn, tempfile
+from cloudicorn_core import get_random_string, ComponentSourceException, ComponentException, Project
 
-class TestTbLinkedProject(unittest.TestCase):
+class TestLinkedProject(unittest.TestCase):
 
     def setUp(self):
         self.root_dir = tempfile.mkdtemp()
@@ -24,12 +24,12 @@ class TestTbLinkedProject(unittest.TestCase):
 
         a_tfstore = get_random_string(10)
 
-        retcode = tb.main(["tb", "apply", cdir, '--force', 
+        retcode = cloudicorn.main(["cloudicorn", "apply", cdir, '--force', 
                            '--project-dir', pdira,
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
         assert retcode == 0
 
-        retcode = tb.main(["tb", "refresh", cdir,  
+        retcode = cloudicorn.main(["cloudicorn", "refresh", cdir,  
                            '--project-dir', pdira,
                            '--key', 'foo',
                            '--set-var', "tfstate_store_path_a={}".format(os.path.join(self.root_dir, a_tfstore))])
