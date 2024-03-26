@@ -1,8 +1,31 @@
-# terrabuddy
+Terraform + Cloudi = 😎
 
-Terrabuddy is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html).  Terrabuddy allows terraform to be used in a way that is more **DRY**, more **auditable**, and more **modular.**
 
-### Terrabuddy Features
+
+Terraform is a powerful and mature tool for implementing your cloud infrastructure as code. 
+
+Its major features are:
+- **easy to read code** infrastructure code is in a human readable, easy to audit format
+- **extendable** support for all cloud platforms (aws, azure, gcp, etc...) via provider plugins
+- **mature** best in class documentation, large user community, stable codebase and stable plugins
+- **stage changes before deploying** terraform plans and displays changes before applying them to avoid surprises
+- **idempotence** code can be several times without changing the final result, so easy to put into CICD pipelines
+
+However...
+
+In many cases, terraform (and infra as code as a whole) is the ugly duckling in a company's codebase. Implementing new features usually takes priority over IAC because that is what adds value.  As infrastructure requirements change, developers will often implement them manually, or if forced to code them, will lump terraform code into monoliths, running the code over and over and over until it works and calling it a day.  Infra as code is thusly often neglected and quietly accumulates technical debt.  Luckily, with the right tools and methods, IAC has the potential to be a critical asset.
+
+What IAC Should Be
+
+Infrastructure is never perfect.  There are always special cases, cost / benefit compromises, temporary workarounds, long migrations and surprises.  IAC should not be an idealized representation, with the details hidden under the carpet... it should enable colleagues to easily document these specificities, easily understand how the pieces fit together, and have a clear vision of future changes. 
+Infra as code should be simple.  It should take as little developer time as possible while being accessibly to other stakeholders such as architects, support, cyber security and monitoring teams.
+Infra as code should be visual and auditable.  Humanity has had maps for centuries, IAC should be the always up to date map of the company's infrastrucure.
+
+
+
+cloudicorn is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html).  cloudicorn allows terraform to be used in a way that is more **DRY**, more **auditable**, and more **modular.**
+
+### cloudicorn Features
 - easily install and update terraform binaries
 - easily manage component interdependencies via bundles 
 - easily inject variables into your modules
@@ -14,13 +37,13 @@ Terrabuddy is a templating engine built on top of [terraform](https://www.terraf
 ### System Requirements
 
 - python3 with pip3 in your $PATH
-- `pip install terrabuddy`
+- `pip install cloudicorn`
 
 **or install using setup.py**
 
 ```
-git clone https://github.com/jumidev/terrabuddy.git
-cd terrabuddy/tb
+git clone https://github.com/jumidev/cloudicorn.git
+cd cloudicorn/tb
 make install             # installs the tb CLI tool with python requirements
 
 tb --setup               # downloads and installs terraform
@@ -30,7 +53,7 @@ tb --setup-shell         # (optional) installs useful tb shell aliases
 
 ### Installing & using terraform modules
 
-terrabuddy can work with any terraform code.  
+cloudicorn can work with any terraform code.  
 
 - A repo with modules for Azure is provided [here](https://github.com/jumidev/terraform-modules-azure.git)
 - For AWS, [here](https://github.com/jumidev/terraform-modules-aws.git). (WIP)
@@ -38,7 +61,7 @@ terrabuddy can work with any terraform code.
 
 # Background
 
-`tb` is the terrabuddy command line interface.  It facilitates setting up your machine (see installation), allows you to list components and run terraform commands such as **plan**, **apply**, **destroy** and manages shared variables. 
+`tb` is the cloudicorn command line interface.  It facilitates setting up your machine (see installation), allows you to list components and run terraform commands such as **plan**, **apply**, **destroy** and manages shared variables. 
 
 tb introduces three notions for managing resoureces: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and tb knows how to create them in the correct order).
 
@@ -170,7 +193,7 @@ $ tb showvars prep/bastion/managed_disk
 COMPONENT_DIRNAME=managed_disk
 COMPONENT_PATH=prep/bastion/managed_disk
 PROJECT_ROOT=/home/user/myprojects/az-platform-infra
-TB_INSTALL_PATH=/home/user/wf/terrabuddy/tb
+TB_INSTALL_PATH=/home/user/wf/cloudicorn/tb
 appname=bastion
 env=prep
 location=westeurope
@@ -291,7 +314,7 @@ The above result means that the component already exists in Azure and is up to d
 
 ## Git workflow integration
 
-`tb` was designed to take git workflow considerations into account.  When working with terrabuddy components, special care must be taken so ensure that developers working on separate components do not clobber each other's work.  tb includes git checking functions to inform developers if their local git repository is behind remote changes.
+`tb` was designed to take git workflow considerations into account.  When working with cloudicorn components, special care must be taken so ensure that developers working on separate components do not clobber each other's work.  tb includes git checking functions to inform developers if their local git repository is behind remote changes.
 
 For instance, developers A and B work on two unrelated components.
 

@@ -1,6 +1,6 @@
-# running terrabuddy tests
+# running cloudicorn tests
 
-Terrabuddy tests use standard python unit test cases, to run them, simply do
+cloudicorn tests use standard python unit test cases, to run them, simply do
 
 ```
 make test
@@ -9,8 +9,8 @@ make test
 There is also a dockerfile at the root of this project that can be used to run the tests in docker.
 
 ```
-docker build . -f Dockerfile-tests -t test-terrabuddy
-docker run -it test-terrabuddy
+docker build . -f Dockerfile-tests -t test-cloudicorn
+docker run -it test-cloudicorn
 ```
 
 # TODO

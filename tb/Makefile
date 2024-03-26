@@ -5,5 +5,5 @@ install: uninstall
 	rm -rf build dist *egg-info
 
 uninstall:
-	pip3 uninstall terrabuddy -y
+	pip3 uninstall cloudicorn-cli -y
 

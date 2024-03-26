@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 setup:
 	python3 -m venv venv
-	source venv/bin/activate && PYTHONWARNINGS=ignore pip uninstall terrabuddy -y
+	source venv/bin/activate && PYTHONWARNINGS=ignore pip uninstall cloudicorn -y
 	source venv/bin/activate && PYTHONWARNINGS=ignore pip install -r requirements.txt
 	source venv/bin/activate && PYTHONWARNINGS=ignore cd ../tb && python3 setup.py install 
 

@@ -11,12 +11,12 @@ with open("../README.md", "r") as fh:
 with open("requirements.txt", "r") as fh:
     install_requires = fh.readlines()
 
-setup(name='terrabuddy',
+setup(name='cloudicorn',
     version='0.1',
     description='A python wrapper for multipass',
     long_description=long_description,
     long_description_content_type="text/markdown",      
-    url='https://github.com/jumidev/terrabuddy',
+    url='https://github.com/jumidev/cloudicorn',
     author='krezreb',
     author_email='josephbeeson@gmail.com',
     license='MIT',

@@ -28,7 +28,7 @@ def main(argv=[]):
 
     f = Figlet(font='slant')
 
-    parser = argparse.ArgumentParser(description='{}\nTB, facilitates terraform with nifty features n such.'.format(f.renderText('terrabuddy')),
+    parser = argparse.ArgumentParser(description='{}\nTB, facilitates terraform with nifty features n such.'.format(f.renderText('cloudicorn')),
     add_help=True,
     epilog=epilog,
     formatter_class=argparse.RawTextHelpFormatter)

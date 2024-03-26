@@ -19,10 +19,10 @@ install:
 	cd tb && make install
 
 build_test_docker:
-	docker build . -f Dockerfile-tests -t test-terrabuddy
+	docker build . -f Dockerfile-tests -t test-cloudicorn
 	
 test_docker: build_test_docker
-	docker run -it test-terrabuddy
+	docker run -it test-cloudicorn
 
 publish_pypi:
 	cd tb && rm -rf dist build && \

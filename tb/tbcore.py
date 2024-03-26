@@ -37,7 +37,7 @@ def get_tg_cachedir(salt, cleanup=True):
     current_date_slug = datetime.today().strftime('%Y-%m-%d')
     
     slug = hashlib.sha224("{}{}".format(get_random_string(64),salt).encode('utf-8')).hexdigest()
-    wdir_root = os.path.expanduser('~/.cache/terrabuddy/')
+    wdir_root = os.path.expanduser('~/.cache/cloudicorn/')
 
     wdir_d = os.path.join(wdir_root, current_date_slug)
 
@@ -1494,8 +1494,8 @@ class TfStateStoreFilesystem(TfStateStore):
 
 class Utils():
 
-    conf_dir = os.path.expanduser("~/.config/terrabuddy")
-    bin_dir = os.path.expanduser("~/.config/terrabuddy/bin")
+    conf_dir = os.path.expanduser("~/.config/cloudicorn")
+    bin_dir = os.path.expanduser("~/.config/cloudicorn/bin")
 
     @staticmethod
     def download_progress(url, filename, w=None):
