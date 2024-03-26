@@ -37,18 +37,16 @@ cloudicorn is a templating engine built on top of [terraform](https://www.terraf
 ### System Requirements
 
 - python3 with pip3 in your $PATH
-- `pip install cloudicorn`
+- `pip install cloudicorn-cli`
 
 **or install using setup.py**
 
 ```
-git clone https://github.com/jumidev/cloudicorn.git
-cd cloudicorn/tb
-make install             # installs the tb CLI tool with python requirements
+git clone https://github.com/jumidev/cloudicorn-cli.git
+cd cloudicorn-cli/cli
+make install             # installs the cloudicorn CLI tool with python requirements
 
-tb --setup               # downloads and installs terraform
-tb --setup-terraformrc   # (optional) installs useful terraform default settings
-tb --setup-shell         # (optional) installs useful tb shell aliases
+cloudicorn_setup         # downloads and installs terraform
 ```
 
 ### Installing & using terraform modules
@@ -61,9 +59,9 @@ cloudicorn can work with any terraform code.
 
 # Background
 
-`tb` is the cloudicorn command line interface.  It facilitates setting up your machine (see installation), allows you to list components and run terraform commands such as **plan**, **apply**, **destroy** and manages shared variables. 
+`cloudicorn` is the cloudicorn command line interface.  It facilitates setting up your machine (see installation), allows you to list components and run terraform commands such as **plan**, **apply**, **destroy** and manages shared variables. 
 
-tb introduces three notions for managing resoureces: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and tb knows how to create them in the correct order).
+tb introduces three notions for managing resoureces: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and cloudicorn knows how to create them in the correct order).
 
 ## Anatomy of a project:
 
@@ -106,12 +104,12 @@ inputs {
 ```
 
 - the `inputs` block contains the inputs which will be injected into the terraform module
-- the `source` block tells tb which terraform module to use with this component, can be a local path or a git repo.
+- the `source` block tells cloudicorn which terraform module to use with this component, can be a local path or a git repo.
 - hclt files contain variables, formatted `**${like_this}**`
 
 ### Component parsing and variables
 
-When `tb` is run on a component, it:
+When `cloudicorn` is run on a component, it:
 
 1. lints/parses all hclt files, fails if there are syntax errors
 1. loads all yml files in the component and all parent directories as variables. 
@@ -185,10 +183,10 @@ tb loads variables in a cascade process, starting at the project root and moving
 
 If, for example, **project.yml** contains `appname`, its value will be overridden by **prep/bastion/appname.yml**.
 
-You can use tb to display component variables with the `showvars` command
+You can use cloudicorn  to display component variables with the `showvars` command
 
 ```
-$ tb showvars prep/bastion/managed_disk
+$ cloudicorn  showvars prep/bastion/managed_disk
 
 COMPONENT_DIRNAME=managed_disk
 COMPONENT_PATH=prep/bastion/managed_disk
@@ -207,7 +205,7 @@ vnet_cidr=172.16.0.0/19
 
 **Special Variables**
 
-In addition to variables loaded in .yml files, tb also provides special variables
+In addition to variables loaded in .yml files, cloudicorn  also provides special variables
 
 - `COMPONENT_PATH` full path to component, relative to project
 - `COMPONENT_DIRNAME` innermost component directory
@@ -228,12 +226,12 @@ order:
     - virtual_machine
 ```
 
-The above bundle tells tb that when the user runs `tb <command> prep/bastion` it will in fact run four components: `prep/bastion/network_interface`, `prep/bastion/a_record`, etc... in the specified order.  When running the destroy command, this order is reversed.
+The above bundle tells cloudicorn  that when the user runs `tb <command> prep/bastion` it will in fact run four components: `prep/bastion/network_interface`, `prep/bastion/a_record`, etc... in the specified order.  When running the destroy command, this order is reversed.
 
 You can use the `--dry` argument on a bundle to see its components:
 
 ```
-$ tb show prep/bastion --dry
+$ cloudicorn  show prep/bastion --dry
 
 tb show prep/bastion/network_interface
 tb show prep/bastion/a_record
@@ -268,7 +266,7 @@ $ pwd
 ```
 
 ```
-$ tb plan
+$ cloudicorn plan
 OOPS, no component specified, try one of these (bundles are bold underlined):
 
 tb plan sbx
@@ -302,7 +300,7 @@ tb plan prod/network_security_groups/db
 
 ```
 
-## running `tb` commands
+## running `cloudicorn` commands
 
 Each of the above lines is a component.  Running `tb plan <component>` will run the plan command on the component in question.
 
@@ -314,17 +312,17 @@ The above result means that the component already exists in Azure and is up to d
 
 ## Git workflow integration
 
-`tb` was designed to take git workflow considerations into account.  When working with cloudicorn components, special care must be taken so ensure that developers working on separate components do not clobber each other's work.  tb includes git checking functions to inform developers if their local git repository is behind remote changes.
+`cloudicorn` was designed to take git workflow considerations into account.  When working with cloudicorn components, special care must be taken so ensure that developers working on separate components do not clobber each other's work.  cloudicorn includes git checking functions to inform developers if their local git repository is behind remote changes.
 
 For instance, developers A and B work on two unrelated components.
 
 1. Developer A is working on an application VM in `prep/testappA/virtual_machine`.  Developer A sees that network security rules do not allow their application to access required resources.  They amend the security group `prep/network_security_groups/db-apps` to add the required security rules.  They apply their changes and push to remote.
 1. Developer B is working on an unrelated component.  They too need to amend `prep/network_security_groups/db-apps` to add their own required security rules (different from those that Developer A added).  They have forgotten to `git pull` so the changes made by Developer A are not on their machine.  **If they run `tb apply prep/network_security_groups/db-apps` they will clobber developer A's changes.**  
-1. **However** tb does a git fetch and compares branches **before** each command.
-1. Since Developer A has pushed their changes, tb on Developer B'a machine will show this message:
+1. **However** cloudicorn does a git fetch and compares branches **before** each command.
+1. Since Developer A has pushed their changes, cloudicorn on Developer B'a machine will show this message:
 `GIT ERROR: You are on branch master and are behind the remote.  Please git pull and/or merge before proceeding.  Below is a git status:...`
 
-The above also works for feature branches.  If developer B is working on a feature branch that was made prior to developer A's changes (pushed to master branch), tb will detect that Developer B's FB is behind master and prompt them to merge before proceeding.
+The above also works for feature branches.  If developer B is working on a feature branch that was made prior to developer A's changes (pushed to master branch), cloudicorn will detect that Developer B's FB is behind master and prompt them to merge before proceeding.
 
 # TODO
 
@@ -333,10 +331,10 @@ The above also works for feature branches.  If developer B is working on a featu
     - auto cleanup previous runs older than x days
     - auto manage remote states, 
     - enrypted remote states
-- tb catalog
+- cloudicorn catalog
     - for given resource type, get dependency tree, required and optional
-- tb catalog-generator
+- cloudicorn catalog-generator
 
-- tb chart
-    spin up a visualizer of current tb project
+- cloudicorn chart
+    spin up a visualizer of current cloudicorn project
 - example spoke and hub architecture

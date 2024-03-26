@@ -11,12 +11,12 @@ with open("../README.md", "r") as fh:
 with open("requirements.txt", "r") as fh:
     install_requires = fh.readlines()
 
-setup(name='cloudicorn',
+setup(name='cloudicorn-cli',
     version='0.1',
     description='Taking Infrastructure As Code to the next level',
     long_description=long_description,
     long_description_content_type="text/markdown",      
-    url='https://github.com/jumidev/cloudicorn',
+    url='https://github.com/jumidev/cloudicorn-cli',
     author='krezreb',
     author_email='josephbeeson@gmail.com',
     license='MIT',

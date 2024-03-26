@@ -2,4 +2,5 @@ pytest
 
 azure-mgmt-resource
 azure-identity
-msal[broker]==1.24.0b2
+#msal[broker]==1.24.0b2
+msal[broker]==1.26.0
