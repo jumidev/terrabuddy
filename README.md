@@ -1,21 +1,21 @@
-Terraform + Cloudi = 😎
+# Cloudicorn + Terraform = 😎
 
+Cloudicorn is what infra as code should be.  It's a combination of terraform with a specific methodolgy and toolset to make IAC easy to bootstrap, scalable, and resistant to technical debt
 
+### Terraform in a nutshell
 
-Terraform is a powerful and mature tool for implementing your cloud infrastructure as code. 
-
-Its major features are:
+Terraform is a powerful and mature tool for implementing your cloud infrastructure as code. Its major features are:
 - **easy to read code** infrastructure code is in a human readable, easy to audit format
 - **extendable** support for all cloud platforms (aws, azure, gcp, etc...) via provider plugins
 - **mature** best in class documentation, large user community, stable codebase and stable plugins
 - **stage changes before deploying** terraform plans and displays changes before applying them to avoid surprises
 - **idempotence** code can be several times without changing the final result, so easy to put into CICD pipelines
 
-However...
+### However...
 
 In many cases, terraform (and infra as code as a whole) is the ugly duckling in a company's codebase. Implementing new features usually takes priority over IAC because that is what adds value.  As infrastructure requirements change, developers will often implement them manually, or if forced to code them, will lump terraform code into monoliths, running the code over and over and over until it works and calling it a day.  Infra as code is thusly often neglected and quietly accumulates technical debt.  Luckily, with the right tools and methods, IAC has the potential to be a critical asset.
 
-What IAC Should Be
+# What IAC Should Be
 
 Infrastructure is never perfect.  There are always special cases, cost / benefit compromises, temporary workarounds, long migrations and surprises.  IAC should not be an idealized representation, with the details hidden under the carpet... it should enable colleagues to easily document these specificities, easily understand how the pieces fit together, and have a clear vision of future changes. 
 Infra as code should be simple.  It should take as little developer time as possible while being accessibly to other stakeholders such as architects, support, cyber security and monitoring teams.
