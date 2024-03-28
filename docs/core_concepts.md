@@ -1,11 +1,11 @@
 # Core Concepts
 
-1. [Terraform](#Terraform)
-1. [Projects]
-1. Components 
-1. Bundles
-1. Variables
-1. Git workflow integration
+1. [Terraform](#terraform)
+1. [Projects](#projects)
+1. [Components](#components)
+1. [Bundles](#bundles)
+1. [Variables]
+1. [Git workflow safety checks](#git-workflow-safety-checks)
 
 ## Terraform
 
@@ -19,11 +19,24 @@ Cloudicorn is built on top of terraform. Terraform is a powerful and mature tool
 
 For more detailed information about terraform, visit [Their website](https://developer.hashicorp.com/terraform)
 
+### Cloudicorn execution workflow
+
+To provision cloud resources, Cloudicorn uses the same code execution pattern as [terraform](https://developer.hashicorp.com/terraform/cli/run):
+
+- `plan` compares the component code with the actual resources present on the cloud.  Displays a list of changes (resources to be created, modified, or removed)
+- `apply` using the above plan, provisions cloud resources to match the component
+- `destroy` destroys the cloud resources
+
+Cloudicorn has additional commands:
+
+- `show` lists one or more components in the current project
+- `showvars` shows variables for one or more components in the current project
+- `parse` parses the template of a given component, displays any parsing errors
 
 
 ## Projects
 
-The top level organisational unit is the project (typically a git repository).  Projects contain the environments, global configuration options, and of course the components. Below is an example project encompassing three environments
+The top level organisational unit is the project (typically a git repository).  Projects contain the environments, global configuration options, and of course the components. Below is an example project:
 
 ```
 prep/
@@ -36,14 +49,22 @@ README.md
 tfstate_store.hclt
 ```
 
-- The top level directories in the project correspond to the environments, `sbx` (sandbox), `prep` (pre-prod), and  `prod`.  
+- The top level directories in the above example correspond to the environments, `sbx` (sandbox), `prep` (pre-prod), and  `prod`.  This is a recommended folder structure, but not required.  You are free to organize your components as you see fit.
 - .envrc.tpl contains a template for required environment variables, notably TF_MODULES_ROOT which points to the repo in to which terraform-modules-azure has been cloned
 - project.yml contains project-specific variables.  Other .yml files within the project contain 
-- tfstate_store.hclt is an hcl template that will be applied in all components
+- tfstate_store.hclt is an hcl template that will be applied in all components ([see cascading components](#cascading-components))
 
-## Anatomy of a component:
+You can initialize a project in an empty directory using `cloudicorn_setup`
+
+## Components
+
+Cloudicorn Components are functional groups of cloud assets.  They are intended to be as small as possible to allow for fast iteration.  A component is comprised of a terraform module and a set of arguments for that module defined in `component.hclt`.
+
+### Anatomy of a component
 
 Components are hclt files, e.g. hcl templates.  [HCL](https://www.terraform.io/docs/configuration/syntax.html) is a json-like declarative language used by terraform.
+
+Components require at least two blocks, `source` and `inputs`
 
 ```
 cat component.hclt
@@ -61,9 +82,54 @@ inputs {
 }
 ```
 
-- the `inputs` block contains the inputs which will be injected into the terraform module
 - the `source` block tells cloudicorn which terraform module to use with this component, can be a local path or a git repo.
-- hclt files contain variables, formatted `**${like_this}**`
+- the `inputs` block contains the inputs which will be injected into the terraform module
+
+Additionally, the following blocks can be declared in a component template:
+
+- `tfstate_store` tells cloudicorn where to store the [remote state](https://developer.hashicorp.com/terraform/language/state/remote) of the component, can be a local folder, network path or cloud storage path.  You can set up remote state storage on a project using `cloudicorn_setup`
+- `component_inputs` tells cloudicorn to inject values into this component from another component, this is how component interdependencies are declared.
+
+### Cascading components
+
+To avoid configuration duplication, component templates can be placed anywhere in the project .  For example, to avoid having to redeclare the `tfstate_store` blocks in all components, a `tfstate_store.hclt` file can be created in the root of the project
+
+
+## Variables
+
+To avoid unnecessary configuration duplication, variables can be declared anywhere in a project using yml files.
+
+Example `project.yml` at the root of a project:
+
+```
+project_name: "kubernetes infra"
+region: "northeurope-2"
+foo: "bar"
+```
+
+The three variables, `project_name`, `region`, `foo` can be called from any component as `${project_name}`, `${region}`, `${foo}`, respectively. \
+Variables can call each other as well as make use of envrionment variables.  For more details see [Detailed Component variables examples](#detailed-component-variables-examples)
+
+### Special variables
+
+In addition to variables loaded in .yml files, cloudicorn  also provides special variables
+
+- `COMPONENT_PATH` full path to component, relative to project
+- `COMPONENT_DIRNAME` innermost component directory
+- `PROJECT_ROOT` absolute path to project
+
+### Variables cascade
+
+Variables declared in subfolders are only visible in that folder.
+
+Example `sbx/env.yml`
+
+```
+env: "sandbox"
+foo: "bazzzz"
+```
+
+Components in sbx and subfolders that use `${foo}` will get `bazzzz` as the value, rather than `bar`
 
 ### Component parsing and variables
 
@@ -75,9 +141,9 @@ When `cloudicorn` is run on a component, it:
 1. replaces all variables in the hclt.  If variables are left unreplaced, the parser stops with an error message.
 1. if all variables are replaced, it performs the requested terraform action (`plan`, `apply`, `destroy`, etc)
 
-**Component parsing in detail**
+### Component cascading examples
 
-combines hclt files in the component directory with those in its parent directories.  For example, at the root of the project there is a tfstate_store.hclt file.  The contents of this file will be included in **all components**.
+As explained above, at the root of the project there is a tfstate_store.hclt file.  The contents of this file will be included in **all components**.
 
 Another example is to refactor the source.hclt in a situation where a folder contains lots of components that use the same terraform module.
 
@@ -119,17 +185,7 @@ prep/network_security_groups/public-webserver:
 component.hclt
 ```
 
-**Template Overriding**
-
-hclt files in upper directoryies can be overriddden by placing files with the same name deeper in the filesystem.  For example, if you have a component that requires a specific tfstate_store configuration, you can override the one in the root folder, thusly:
-
-```
-prep/network_security_groups/public-webserver-other-remote-state:
-component.hclt
-tfstate_store.hclt  # overrides tfstate_store.hclt in project root
-```
-
-**Component variables in detail**
+### Detailed Component variables examples
 
 cloudicorn loads variables in a cascade process, starting at the project root and moving down the filesystem to the component.  For example for `prep/bastion/managed_disk`, the following yml files are loaded:
 
@@ -161,13 +217,6 @@ vnet_cidr=172.16.0.0/19
 
 ```
 
-**Special Variables**
-
-In addition to variables loaded in .yml files, cloudicorn  also provides special variables
-
-- `COMPONENT_PATH` full path to component, relative to project
-- `COMPONENT_DIRNAME` innermost component directory
-- `PROJECT_ROOT` absolute path to project
 
 
 ## Bundles
@@ -268,7 +317,7 @@ Each of the above lines is a component.  Running `cloudicorn plan <component>` w
 
 The above result means that the component already exists in Azure and is up to date with the component.
 
-## Git workflow integration
+## Git workflow safety checks
 
 `cloudicorn` was designed to take git workflow considerations into account.  When working with cloudicorn components, special care must be taken so ensure that developers working on separate components do not clobber each other's work.  cloudicorn includes git checking functions to inform developers if their local git repository is behind remote changes.
 
