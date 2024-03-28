@@ -4,7 +4,7 @@
 1. [Projects](#projects)
 1. [Components](#components)
 1. [Bundles](#bundles)
-1. [Variables]
+1. [Variables](#variables)
 1. [Git workflow safety checks](#git-workflow-safety-checks)
 
 ## Terraform
