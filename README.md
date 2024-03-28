@@ -20,8 +20,8 @@ Managing Cloud infrastructure is **`Difficult`**, **`Messy`** and **`Volatile.`*
 
 There's more to it than that, but that's the idea.  Thanks for making it this far.  If you're interested in learning more about cloudicorn:
 
-- Getting Started
-- Installation
-- Core concepts
+- [Getting Started](docs/)
+- [Installation](docs/installation.md)
+- [Core concepts](docs/core_concepts.md)
 - Examples
 
