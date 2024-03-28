@@ -672,6 +672,7 @@ def main(argv=[]):
     add_help=True,
     formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--debug', action='store_true', help='display debug messages')
+    parser.add_argument('--install', action='store_true', help='install / upgrade terraform')
     args = parser.parse_args(args=argv)
 
     if args.debug or os.getenv('CLOUDICORN_DEBUG', 'n')[0].lower() in ['y', 't', '1'] :
@@ -689,7 +690,6 @@ def main(argv=[]):
 
             ]
         }
-        
         
     }
     
@@ -735,13 +735,15 @@ def main(argv=[]):
         else:
             menuvalues.insert(0,('new_project', 'New Project'))
 
-
-        result = radiolist_dialog(
-            values=menuvalues,
-            title=menu["main"]["title"],
-            text=menu["main"]["text"],
-            default = result
-        ).run()
+        if args.install:
+            result = "terraform"
+        else:
+            result = radiolist_dialog(
+                values=menuvalues,
+                title=menu["main"]["title"],
+                text=menu["main"]["text"],
+                default = result
+            ).run()
 
         u = Utils()
 
@@ -801,6 +803,9 @@ def main(argv=[]):
                 title='Error',
                 text='Could not check {}\n {}.'.format(result, str(e))).run()
             time.sleep(0.3)
+
+        if args.install:
+            result = None
 
         if result == "tfstore_setup_encryption":
             tfstate_store_encryption_passphrases = []

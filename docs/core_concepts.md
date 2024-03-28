@@ -1,78 +1,29 @@
-# Cloudicorn + Terraform = 😎
+# Core Concepts
 
-Cloudicorn is what infra as code should be.  It's a combination of terraform with a specific methodolgy and toolset to make IAC easy to bootstrap, scalable, and resistant to technical debt
+1. [Terraform](#Terraform)
+1. [Projects]
+1. Components 
+1. Bundles
+1. Variables
+1. Git workflow integration
 
-### Terraform in a nutshell
+## Terraform
 
-Terraform is a powerful and mature tool for implementing your cloud infrastructure as code. Its major features are:
-- **easy to read code** infrastructure code is in a human readable, easy to audit format
-- **extendable** support for all cloud platforms (aws, azure, gcp, etc...) via provider plugins
-- **mature** best in class documentation, large user community, stable codebase and stable plugins
-- **stage changes before deploying** terraform plans and displays changes before applying them to avoid surprises
-- **idempotence** code can be several times without changing the final result, so easy to put into CICD pipelines
+Cloudicorn is built on top of terraform. Terraform is a powerful and mature tool for implementing your cloud infrastructure as code. Its major features are:
 
-### However...
+- **`easy to read code`** infrastructure code is in a human readable, easy to audit format
+- **`extendable`** support for all cloud platforms (aws, azure, gcp, etc...) via provider plugins
+- **`mature`** best in class documentation, large user community, stable codebase and stable plugins
+- **`stage changes before deploying`** terraform plans and displays changes before applying them to avoid surprises
+- **`idempotence`** code can be run several times without changing the final result, so easy to put into CICD pipelines
 
-In many cases, terraform (and infra as code as a whole) is the ugly duckling in a company's codebase. Implementing new features and adding value to applications usually takes priority over IAC.  As infrastructure requirements change, developers will often implement them manually, or if forced to code them, will lump terraform code into monoliths, running the code over and over and over until it works and calling it a day.  Infra as code is thus often neglected and quietly accumulates technical debt.  Luckily, with the right tools and methods, IAC has the potential to be a critical asset.
-
-# What IAC Should Be
-
-- **Infrastructure is never perfect.**  There are always special cases, cost / benefit compromises, legacy systems, temporary workarounds, long migrations and surprises.  IAC should not get in the of way implementing these specificities, rather it should enable colleagues to document them clearly, easily understand how the pieces fit together, and have a clear vision of future changes.
-- Infra as code **should be simple**.  It should take as little developer time as possible while being accessible to other stakeholders such as architects, support, cyber security and monitoring teams.
-- Infra as code **should be visual and auditable**.  Humanity has had maps for centuries, IAC should be the always up to date map of your infrastrucure.
-
-# The cloudicorn approach
-
-- Using Cloudicorn, cloud assets are grouped into functional units called `components.`  Component definitions are written in a json-like syntax called hcl.
-- Components are linked together, this allows interdependencies to be explicit from a functional point of view (rather than technical dependencies)
-- Cloudicorn ships with pre-coded components for major cloud providers designed to fit most use cases.  You can of course write your own components!
-- Cloudicorn provides a gui tool to visualize your infrastructure from a functional point of view.
+For more detailed information about terraform, visit [Their website](https://developer.hashicorp.com/terraform)
 
 
 
-cloudicorn is a templating engine built on top of [terraform](https://www.terraform.io/intro/index.html).  cloudicorn allows terraform to be used in a way that is more **DRY**, more **auditable**, and more **modular.**
+## Projects
 
-### cloudicorn Features
-- easily install and update terraform binaries
-- easily manage component interdependencies via bundles 
-- easily inject variables into your modules
-- built in git workflow support
-
-
-# Installation
-
-### System Requirements
-
-- python3 with pip3 in your $PATH
-- `pip install cloudicorn-cli`
-
-**or install using setup.py**
-
-```
-git clone https://github.com/jumidev/cloudicorn-cli.git
-cd cloudicorn-cli/cli
-make install             # installs the cloudicorn CLI tool with python requirements
-
-cloudicorn_setup         # downloads and installs terraform
-```
-
-### Installing & using terraform modules
-
-cloudicorn can work with any terraform code.  
-
-- A repo with modules for Azure is provided [here](https://github.com/jumidev/terraform-modules-azure.git)
-- For AWS, [here](https://github.com/jumidev/terraform-modules-aws.git). (WIP)
-
-
-# Background
-
-`cloudicorn` is the cloudicorn command line interface.  It facilitates setting up your machine (see installation), allows you to list components and run terraform commands such as **plan**, **apply**, **destroy** and manages shared variables. 
-
-tb introduces three notions for managing resoureces: **projects**, **components** and **bundles**.  A project is a git repo with a specific purpose.  Components are individual objects that you create on your cloud provider.  Bundles are sets of components that depend upon one another (and cloudicorn knows how to create them in the correct order).
-
-## Anatomy of a project:
-
-Below is an example project encompassing three environments
+The top level organisational unit is the project (typically a git repository).  Projects contain the environments, global configuration options, and of course the components. Below is an example project encompassing three environments
 
 ```
 prep/
@@ -180,7 +131,7 @@ tfstate_store.hclt  # overrides tfstate_store.hclt in project root
 
 **Component variables in detail**
 
-tb loads variables in a cascade process, starting at the project root and moving down the filesystem to the component.  For example for `prep/bastion/managed_disk`, the following yml files are loaded:
+cloudicorn loads variables in a cascade process, starting at the project root and moving down the filesystem to the component.  For example for `prep/bastion/managed_disk`, the following yml files are loaded:
 
 1. **project.yml** in the project root, contains various key/value pairs
 1. **prep/env.yml** \
@@ -233,17 +184,17 @@ order:
     - virtual_machine
 ```
 
-The above bundle tells cloudicorn  that when the user runs `tb <command> prep/bastion` it will in fact run four components: `prep/bastion/network_interface`, `prep/bastion/a_record`, etc... in the specified order.  When running the destroy command, this order is reversed.
+The above bundle tells cloudicorn  that when the user runs `cloudicorn <command> prep/bastion` it will in fact run four components: `prep/bastion/network_interface`, `prep/bastion/a_record`, etc... in the specified order.  When running the destroy command, this order is reversed.
 
 You can use the `--dry` argument on a bundle to see its components:
 
 ```
 $ cloudicorn  show prep/bastion --dry
 
-tb show prep/bastion/network_interface
-tb show prep/bastion/a_record
-tb show prep/bastion/managed_disk
-tb show prep/bastion/virtual_machine
+cloudicorn show prep/bastion/network_interface
+cloudicorn show prep/bastion/a_record
+cloudicorn show prep/bastion/managed_disk
+cloudicorn show prep/bastion/virtual_machine
 ```
 
 Bundles also support wildcards and other bundles, for example `prep/bundle.yml`
@@ -259,13 +210,13 @@ order:
     - bastion                       # this is another bundle
 ```
 
-`tb <command> prep` is thus a single "monster" bundle that runs the entire prep environment
+`cloudicorn <command> prep` is thus a single "monster" bundle that runs the entire prep environment
 
 
 ## Listing Components and bundles
 
-tb uses the same commands as terraform: [plan, apply, destroy, refresh, etc](https://www.terraform.io/docs/commands/index.html).
-Components in a project can be listed with the `tb plan|apply|show` command.
+cloudicorn uses the same commands as terraform: [plan, apply, destroy, refresh, etc](https://www.terraform.io/docs/commands/index.html).
+Components in a project can be listed with the `cloudicorn plan|apply|show` command.
 
 ```
 $ pwd
@@ -276,40 +227,40 @@ $ pwd
 $ cloudicorn plan
 OOPS, no component specified, try one of these (bundles are bold underlined):
 
-tb plan sbx
-tb plan sbx/application_security_groups/db-apps
-tb plan sbx/application_security_groups/public-webserver
-tb plan sbx/application_security_groups/manager
-tb plan sbx/application_security_groups/db
-tb plan sbx/application_security_groups/bastion
-tb plan sbx/virtual_network
-tb plan sbx/storage_account/std
-tb plan sbx/storage_account/premium
-tb plan sbx/dns/zone/sbx.weatherforce.net
-tb plan sbx/dns/zone/sbx.prv
-tb plan prod/keybaseca
-tb plan prod/keybaseca/network_interface
-tb plan prod/keybaseca/managed_disk
-tb plan prod/keybaseca/virtual_machine
-tb plan prod/keybaseca/a_record
-tb plan prod/application_security_groups/db-apps
-tb plan prod/application_security_groups/public-webserver
-tb plan prod/application_security_groups/db
-tb plan prod/bastion
-tb plan prod/bastion/network_interface
-tb plan prod/bastion/virtual_machine
-tb plan prod/bastion/a_record
-tb plan prod/resource_group
-tb plan prod/network_security_groups/db-apps
-tb plan prod/network_security_groups/public-webserver
-tb plan prod/network_security_groups/db
+cloudicorn plan sbx
+cloudicorn plan sbx/application_security_groups/db-apps
+cloudicorn plan sbx/application_security_groups/public-webserver
+cloudicorn plan sbx/application_security_groups/manager
+cloudicorn plan sbx/application_security_groups/db
+cloudicorn plan sbx/application_security_groups/bastion
+cloudicorn plan sbx/virtual_network
+cloudicorn plan sbx/storage_account/std
+cloudicorn plan sbx/storage_account/premium
+cloudicorn plan sbx/dns/zone/sbx.weatherforce.net
+cloudicorn plan sbx/dns/zone/sbx.prv
+cloudicorn plan prod/keybaseca
+cloudicorn plan prod/keybaseca/network_interface
+cloudicorn plan prod/keybaseca/managed_disk
+cloudicorn plan prod/keybaseca/virtual_machine
+cloudicorn plan prod/keybaseca/a_record
+cloudicorn plan prod/application_security_groups/db-apps
+cloudicorn plan prod/application_security_groups/public-webserver
+cloudicorn plan prod/application_security_groups/db
+cloudicorn plan prod/bastion
+cloudicorn plan prod/bastion/network_interface
+cloudicorn plan prod/bastion/virtual_machine
+cloudicorn plan prod/bastion/a_record
+cloudicorn plan prod/resource_group
+cloudicorn plan prod/network_security_groups/db-apps
+cloudicorn plan prod/network_security_groups/public-webserver
+cloudicorn plan prod/network_security_groups/db
 ...
 
 ```
 
 ## running `cloudicorn` commands
 
-Each of the above lines is a component.  Running `tb plan <component>` will run the plan command on the component in question.
+Each of the above lines is a component.  Running `cloudicorn plan <component>` will run the plan command on the component in question.
 
 ```
 # TODO REDO
@@ -323,13 +274,15 @@ The above result means that the component already exists in Azure and is up to d
 
 For instance, developers A and B work on two unrelated components.
 
-1. Developer A is working on an application VM in `prep/testappA/virtual_machine`.  Developer A sees that network security rules do not allow their application to access required resources.  They amend the security group `prep/network_security_groups/db-apps` to add the required security rules.  They apply their changes and push to remote.
-1. Developer B is working on an unrelated component.  They too need to amend `prep/network_security_groups/db-apps` to add their own required security rules (different from those that Developer A added).  They have forgotten to `git pull` so the changes made by Developer A are not on their machine.  **If they run `tb apply prep/network_security_groups/db-apps` they will clobber developer A's changes.**  
+1. Developer A is working on an application VM in `prep/testappA/virtual_machine`.  Developer A notices that network security rules do not allow their application to access required resources.  They amend the security group `prep/network_security_groups/db-apps` to add the required security rules.  They apply their changes and push to remote.
+1. Developer B is working on an unrelated component.  They too need to amend `prep/network_security_groups/db-apps` to add their own required security rules (different from those that Developer A added).  They have forgotten to `git pull` so the changes made by Developer A are not on their machine.  **If they run `cloudicorn apply prep/network_security_groups/db-apps` they will clobber developer A's changes.**  
 1. **However** cloudicorn does a git fetch and compares branches **before** each command.
 1. Since Developer A has pushed their changes, cloudicorn on Developer B'a machine will show this message:
 `GIT ERROR: You are on branch master and are behind the remote.  Please git pull and/or merge before proceeding.  Below is a git status:...`
 
 The above also works for feature branches.  If developer B is working on a feature branch that was made prior to developer A's changes (pushed to master branch), cloudicorn will detect that Developer B's FB is behind master and prompt them to merge before proceeding.
+
+The above git workflow security is enabled by default.  It can be disabled by setting the `CLOUDICORN_NO_GIT_CHECK` environment variable or via the `--no-git-check` cli flag.
 
 # TODO
 
